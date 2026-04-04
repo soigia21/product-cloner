@@ -1,0 +1,25 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-daughter-bff-forever-personalized-acrylic-photo-plaque-mom131104dgtl?s=rec&w=p",
+  "customilyProductId": "fd80b953-56b1-4bcf-a1d7-5bb6eebad863",
+  "canvas": {
+    "width": 800,
+    "height": 800,
+    "bgColor": null
+  },
+  "layersCount": 3,
+  "textLayersCount": 0,
+  "optionsCount": 2,
+  "downloaded": {
+    "layers": 6,
+    "swatches": 0,
+    "fonts": 0,
+    "errors": []
+  },
+  "outputDir": "extracted/mom131104dgtl-scan",
+  "files": {
+    "appConfig": "app_config.json",
+    "rawProductConfig": "raw_product_config.json",
+    "rawUnifiedSettings": "raw_unified_settings.json",
+    "assetsDir": "assets/"
+  }
+}

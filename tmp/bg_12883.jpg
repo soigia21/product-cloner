@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+    <link rel="stylesheet" media="screen" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600" />
+    <link rel="stylesheet" media="screen" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
+
+    <style>
+        * {
+            -moz-box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+
+        html, body, div, span, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+        abbr, address, cite, code, del, dfn, em, img, ins, kbd, q, samp,
+        small, strong, sub, sup, var, b, i, dl, dt, dd, ol, ul, li,
+        fieldset, form, label, legend, caption, article, aside, canvas, details, figcaption, figure, footer, header, hgroup,
+        menu, nav, section, summary, time, mark, audio, video {
+            margin: 0;
+            padding: 0;
+            border: 0;
+            outline: 0;
+            vertical-align: baseline;
+            background: transparent;
+        }
+
+        article, aside, details, figcaption, figure, footer, header, hgroup, nav, section {
+            display: block;
+        }
+
+        html {
+            font-size: 16px;
+            line-height: 24px;
+            width: 100%;
+            height: 100%;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            overflow-y: scroll;
+            overflow-x: hidden;
+        }
+
+        img {
+            vertical-align: middle;
+            max-width: 100%;
+            height: auto;
+            border: 0;
+            -ms-interpolation-mode: bicubic;
+        }
+
+        body {
+            min-height: 100%;
+            -webkit-font-smoothing: subpixel-antialiased;
+        }
+
+        .clearfix {
+            clear: both;
+            zoom: 1;
+        }
+
+            .clearfix:before, .clearfix:after {
+                content: "\0020";
+                display: block;
+                height: 0;
+                visibility: hidden;
+            }
+
+            .clearfix:after {
+                clear: both;
+            }
+    </style>
+    <style>
+        .plain.error-page-wrapper {
+            font-family: 'Source Sans Pro', sans-serif;
+            background-color: #6355bc;
+            padding: 0 5%;
+            position: relative;
+        }
+
+            .plain.error-page-wrapper .content-container {
+                -webkit-transition: left .5s ease-out, opacity .5s ease-out;
+                -moz-transition: left .5s ease-out, opacity .5s ease-out;
+                -ms-transition: left .5s ease-out, opacity .5s ease-out;
+                -o-transition: left .5s ease-out, opacity .5s ease-out;
+                transition: left .5s ease-out, opacity .5s ease-out;
+                max-width: 80vw;
+                position: relative;
+                left: -30px;
+                opacity: 0;
+            }
+
+                .plain.error-page-wrapper .content-container.in {
+                    left: 0px;
+                    opacity: 1;
+                }
+
+            .plain.error-page-wrapper .head-line {
+                transition: color .2s linear;
+                font-size: 48px;
+                line-height: 60px;
+                color: rgba(255,255,255,.2);
+                letter-spacing: -1px;
+                margin-bottom: 5px;
+            }
+
+            .plain.error-page-wrapper .subheader {
+                transition: color .2s linear;
+                font-size: 36px;
+                line-height: 46px;
+                color: #fff;
+            }
+
+            .plain.error-page-wrapper hr {
+                height: 1px;
+                background-color: rgba(255,255,255,.2);
+                border: none;
+                width: 250px;
+                margin: 35px 0;
+            }
+
+            .plain.error-page-wrapper .context {
+                transition: color .2s linear;
+                font-size: 18px;
+                line-height: 27px;
+                color: #fff;
+            }
+
+                .plain.error-page-wrapper .context p {
+                    margin: 0;
+                }
+
+                    .plain.error-page-wrapper .context p:nth-child(n+2) {
+                        margin-top: 12px;
+                    }
+
+            .plain.error-page-wrapper .buttons-container {
+                margin-top: 45px;
+                overflow: hidden;
+            }
+
+                .plain.error-page-wrapper .buttons-container a {
+                    transition: color .2s linear, border-color .2s linear;
+                    font-size: 14px;
+                    text-transform: uppercase;
+                    text-decoration: none;
+                    color: #fff;
+                    border: 2px solid white;
+                    border-radius: 99px;
+                    padding: 8px 30px 9px;
+                    display: inline-block;
+                    float: left;
+                }
+
+                    .plain.error-page-wrapper .buttons-container a:hover {
+                        background-color: rgba(255,255,255,.05);
+                    }
+
+                    .plain.error-page-wrapper .buttons-container a:first-child {
+                        margin-right: 25px;
+                    }
+
+        @media screen and (max-width: 485px) {
+            .plain.error-page-wrapper .header {
+                font-size: 36px;
+            }
+
+            .plain.error-page-wrapper .subheader {
+                font-size: 27px;
+                line-height: 38px;
+            }
+
+            .plain.error-page-wrapper hr {
+                width: 185px;
+                margin: 25px 0;
+            }
+
+            .plain.error-page-wrapper .context {
+                font-size: 16px;
+                line-height: 24px;
+            }
+
+            .plain.error-page-wrapper .buttons-container {
+                margin-top: 35px;
+            }
+
+                .plain.error-page-wrapper .buttons-container a {
+                    font-size: 13px;
+                    padding: 8px 0 7px;
+                    width: 45%;
+                    text-align: center;
+                }
+
+                    .plain.error-page-wrapper .buttons-container a:first-child {
+                        margin-right: 10%;
+                    }
+        }
+    </style>
+    <style>
+        .background-color {
+            background-color: rgba(242, 242, 242, 1) !important;
+        }
+
+
+        .primary-text-color {
+            color: rgba(0, 0, 0, 1) !important;
+        }
+
+        .secondary-text-color {
+            color: rgba(114, 88, 224, 1) !important;
+        }
+
+        /*
+        .sign-text-color {
+            color: #FFBA00 !important;
+        }
+
+        .sign-frame-color {
+            color: #343C3F;
+        }
+        */
+        .pane {
+            background-color: #FFFFFF !important;
+        }
+
+        .border-button {
+            color: rgba(114, 88, 224, 1) !important;
+            border-color: rgba(114, 88, 224, 1) !important;
+        }
+
+        .button {
+            background-color: rgba(114, 88, 224, 1) !important;
+            color: #FFFFFF !important;
+        }
+
+        .shadow {
+            box-shadow: 0 0 60px #000000;
+        }
+    </style>
+</head>
+<body class="plain error-page-wrapper background-color background-image">
+  <div class="content-container">
+    <div class="head-line secondary-text-color headlineicon">
+      &#8987;
+    </div>
+    <div class="head-line secondary-text-color headlinetext">
+        Almost there!
+    </div>
+    <div class="context primary-text-color" style="margin-top: 20px;">
+        <p class="fileinfo1">
+            [file]
+        </p>
+    </div>
+    <div class="subheader primary-text-color fileinfo2" style="margin-top: 20px;">
+        File will be ready <b>soon</b>
+    </div>
+    <hr>
+    <div class="clearfix"></div>
+
+  <br/>
+  <br/>
+    <!--
+		<iframe src="https://app.datadoghq.com/graph/embed?token=cb7ecd953b0e22c396b7c9a4b0924f37c7d1a11b929b7cdd68bcd7f8245bc14d&height=200&width=400" width="400" height="200" frameborder="0"></iframe>
+        -->
+
+        <div class="clearfix"></div>
+        <div class="context primary-text-color">
+            <p class="priorityinfo">
+                Need your files faster? 
+				<a href="mailto:hello@customily.com?Subject=I%20want%20the%20priority%20production%20files%20fast%20queue">Ask about our fast queue add on</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+     function ErrorPage(container, pageType, templateName) {
+       this.$container = $(container);
+       this.$contentContainer = this.$container.find(/*this.templateName == 'sign' ? '.sign-container' :*/ '.content-container');
+       this.pageType = pageType;
+       this.templateName = templateName;
+     }
+
+     ErrorPage.prototype.centerContent = function () {
+       var containerHeight = this.$container.outerHeight()
+         , contentContainerHeight = this.$contentContainer.outerHeight()
+         , top = (containerHeight - contentContainerHeight) / 2
+         , offset = /*this.templateName == 'sign' ? -100 :*/ 0;
+
+       this.$contentContainer.css('top', top + offset);
+     };
+
+     ErrorPage.prototype.initialize = function () {
+       var self = this;
+
+       this.centerContent();
+       this.$container.on('resize', function (e) {
+         e.preventDefault();
+         e.stopPropagation();
+         self.centerContent();
+       });
+
+       /* fades in content on the plain template */
+       if (this.templateName == 'plain') {
+         window.setTimeout(function () {
+           self.$contentContainer.addClass('in');
+         }, 500);
+       }
+
+       /*
+       // swings sign in on the sign template
+       if (this.templateName == 'sign') {
+         $('.sign-container').animate({textIndent : 0}, {
+           step : function (now) {
+             $(this).css({
+               transform : 'rotate(' + now + 'deg)',
+               'transform-origin' : 'top center'
+             });
+           },
+           duration : 1000,
+           easing : 'easeOutBounce'
+         });
+       }
+       */
+     };
+
+
+     ErrorPage.prototype.createTimeRangeTag = function(start, end) {
+       return (
+         '<time utime=' + start + ' simple_format="MMM DD, YYYY HH:mm">' + start + '</time> - <time utime=' + end + ' simple_format="MMM DD, YYYY HH:mm">' + end + '</time>.'
+       )
+     };
+
+
+     ErrorPage.prototype.handleStatusFetchSuccess = function (pageType, data) {
+       if (pageType == '503') {
+         $('#replace-with-fetched-data').html(data.status.description);
+       } else {
+         if (!!data.scheduled_maintenances.length) {
+           var maint = data.scheduled_maintenances[0];
+           $('#replace-with-fetched-data').html(this.createTimeRangeTag(maint.scheduled_for, maint.scheduled_until));
+           $.fn.localizeTime();
+         }
+         else {
+           $('#replace-with-fetched-data').html('<em>(there are no active scheduled maintenances)</em>');
+         }
+       }
+     };
+
+
+     ErrorPage.prototype.handleStatusFetchFail = function (pageType) {
+       $('#replace-with-fetched-data').html('<em>(enter a valid Statuspage url)</em>');
+     };
+
+
+     ErrorPage.prototype.fetchStatus = function (pageUrl, pageType) {
+       //console.log('in app.js fetch');
+       if (!pageUrl || !pageType || pageType == '404') return;
+
+       var url = ''
+         , self = this;
+
+       if (pageType == '503') {
+         url = pageUrl + '/api/v2/status.json';
+       }
+       else {
+         url = pageUrl + '/api/v2/scheduled-maintenances/active.json';
+       }
+
+       $.ajax({
+         type : "GET",
+         url : url,
+       }).success(function (data, status) {
+         //console.log('success');
+         self.handleStatusFetchSuccess(pageType, data);
+       }).fail(function (xhr, msg) {
+         //console.log('fail');
+         self.handleStatusFetchFail(pageType);
+       });
+
+     };
+     var ep = new ErrorPage('body', "404", "plain");
+     // ep.initialize(); // waittime will trigger it
+
+     // hack to make sure content stays centered >_<
+     $(window).on('resize', function() {
+       $('body').trigger('resize')
+     });
+
+     let intervalWaitInfo;
+
+     function waitInfo() {
+        let host = "";
+
+        if (location.href.indexOf("localhost:") > 0) {
+          host = "http://localhost:9035/";
+        } else if (location.href.indexOf("cdn.customily.com") > 0) {
+          host = "https://app.customily.com/";
+        } else {
+          console.log(`host for ${location.href} not implemented`);
+          return;
+        }
+
+        var noExport = location.href.indexOf("ExportFile/") < 0;
+        if (noExport) {
+          if (window.console.log) {
+            window.console.log("no exportFile");            
+          }
+          notFound();
+          return;
+        }
+
+        var un = location.pathname
+          .substring(1, location.pathname.lastIndexOf("/"))
+          .split("/")[1];
+
+        var fl = location.pathname.substring(
+          location.pathname.lastIndexOf("/") + 1
+        );
+
+        document.getElementsByClassName("fileinfo1")[0].innerHTML = 
+        document.getElementsByClassName("fileinfo1")[0].innerHTML.replace("[file]", fl);
+
+        var apiurl = host + `api/pfstatus/${encodeURIComponent(un)}/${fl}`;
+
+        /*
+        if (window.console.log) {
+          window.console.log("location: ", location.href);
+          window.console.log("api: ", apiurl);
+        }
+        */
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", apiurl, true);
+        xhr.onreadystatechange = function (aEvt) {
+          if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+              const responseText = this.responseText;
+              if (responseText.indexOf("<html>") > 0) {
+                if (window.console.log) {
+                  window.console.log("response from api is html... skipping");
+                }
+                clearInterval(intervalWaitInfo);
+                ep.initialize();
+                return;
+              }
+
+              try {
+                const r = JSON.parse(responseText);
+  
+                if (r.priority) {
+                  console.log()
+                  document.getElementsByClassName("priorityinfo")[0].style.display = "none"
+                }
+  
+                let fileinfo1 = `File <b>${fl}</b> requested on <b>${new Date(r.created)}</b>`;
+                document.getElementsByClassName("fileinfo1")[0].innerHTML = fileinfo1;
+  
+                let fileinfo2 = "";
+                if (r.status == "waiting") {
+                  fileinfo2 = `File will be ready `
+                  if (r.priority || r.crtoeta <= 0) {
+                    fileinfo2 = fileinfo2 + `soon`;
+                    if (r.  crtoeta <= -60) {
+                      clearInterval(intervalWaitInfo);
+                    }
+                  } else {
+                    fileinfo2 = fileinfo2 + `in about <b>${r.crtoeta} min</b>`;
+                  }
+
+                  var svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid" width="50" height="50" style="display:inline;vertical-align:middle;margin-left:5px;margin-bottom:5px;" xmlns:xlink="http://www.w3.org/1999/xlink"><g><g transform="translate(50 50)"><g>
+                      <animateTransform repeatCount="indefinite" dur="0.47846889952153115s" keyTimes="0;1" values="0;45" type="rotate" attributeName="transform"></animateTransform><path fill="#7258e0" d="M29.17190429162964 -7 L38.171904291629644 -7 L38.171904291629644 7 L29.17190429162964 7 A30 30 0 0 1 25.5773988130421 15.677903876430435 L25.5773988130421 15.677903876430435 L31.94135984372103 22.041864907109364 L22.041864907109368 31.94135984372103 L15.677903876430438 25.5773988130421 A30 30 0 0 1 7.000000000000002 29.17190429162964 L7.000000000000002 29.17190429162964 L7.000000000000003 38.171904291629644 L-6.999999999999997 38.171904291629644 L-6.999999999999998 29.17190429162964 A30 30 0 0 1 -15.677903876430427 25.577398813042105 L-15.677903876430427 25.577398813042105 L-22.041864907109353 31.941359843721035 L-31.94135984372103 22.041864907109364 L-25.577398813042105 15.677903876430435 A30 30 0 0 1 -29.17190429162964 7.00000000000001 L-29.17190429162964 7.00000000000001 L-38.171904291629644 7.000000000000011 L-38.171904291629644 -7.000000000000002 L-29.17190429162964 -7.000000000000003 A30 30 0 0 1 -25.57739881304211 -15.677903876430427 L-25.57739881304211 -15.677903876430427 L-31.941359843721038 -22.041864907109353 L-22.041864907109364 -31.941359843721028 L-15.677903876430435 -25.5773988130421 A30 30 0 0 1 -7.0000000000000115 -29.171904291629637 L-7.0000000000000115 -29.171904291629637 L-7.000000000000013 -38.17190429162964 L6.999999999999999 -38.171904291629644 L7.000000000000001 -29.17190429162964 A30 30 0 0 1 15.677903876430424 -25.57739881304211 L15.677903876430424 -25.57739881304211 L22.04186490710935 -31.941359843721038 L31.941359843721028 -22.041864907109364 L25.5773988130421 -15.677903876430435 A30 30 0 0 1 29.171904291629637 -7.000000000000013 M0 -12A12 12 0 1 0 0 12 A12 12 0 1 0 0 -12"></path></g></g><g></g></g></svg>`
+                  fileinfo2 = fileinfo2 + svg
+                } else if (r.status == "completed") {
+                  document.getElementsByClassName("headlineicon")[0].innerHTML = "👍"
+                  document.getElementsByClassName("headlinetext")[0].innerHTML = "Done"
+                  fileinfo2 = `File ready! Time to <a href="">grab it</a>`;
+                  clearInterval(intervalWaitInfo);
+                } else if (r.status == "failed") {
+                  document.getElementsByClassName("headlineicon")[0].style.display = "none";
+                  document.getElementsByClassName("headlinetext")[0].style.display = "none";
+                  document.getElementsByClassName("priorityinfo")[0].innerHTML = `To resolve this issue, please
+                  <a href="mailto:support@customily.com?Subject=Issue%20with%20production%20file%20generation">reach out to support.</a>`;
+                  document.getElementsByClassName("priorityinfo")[0].style.display = "block";
+
+                  fileinfo2 = `Something went wrong <span style="display: inline-block;transform: rotate(164deg);vertical-align: sub;">&#128034;</span>`;            
+                  clearInterval(intervalWaitInfo);
+                }
+
+                document.getElementsByClassName("fileinfo2")[0].innerHTML = fileinfo2;            
+              } catch (error) {
+                if (window.console.log) {
+                  window.console.log(error);
+                }
+              }
+            } else if (xhr.status == 404) {
+              if (window.console.log) {
+                window.console.log("file not found (404)");
+              }
+              notFound();
+            } else {
+              if (window.console) {
+                window.console.log("cannot get wait time (status: " + xhr.status + ")");
+              }
+            }
+            ep.initialize();
+          }
+        };
+        xhr.send(null);
+      }
+      waitInfo();
+      intervalWaitInfo = setInterval(function () { waitInfo(); }, 60000);
+
+      function notFound() {
+        document.getElementsByClassName("headlineicon")[0].style.display = "none";
+        document.getElementsByClassName("fileinfo2")[0].style.display = "none";
+        document.getElementsByClassName("priorityinfo")[0].style.display = "none";
+        
+        document.getElementsByClassName("fileinfo1")[0].innerHTML = "We're sorry, the requested content is not available.";
+        document.getElementsByClassName("headlinetext")[0].innerHTML = "404";
+
+        ep.initialize();  
+
+        clearInterval(intervalWaitInfo);
+      }
+    </script>
+
+    <!-- OneTrust Cookies Consent Notice (statuspage.io, en-GB) start -->
+    <!--
+    <script src="https://cdn.cookielaw.org/consent/0800f092-2124-46ec-b11d-b4f48b677302.js" type="text/javascript" charset="UTF-8"></script>
+    <script type="text/javascript">
+    function OptanonWrapper() { }
+    </script>
+    -->
+    <!-- OneTrust Cookies Consent Notice (statuspage.io, en-GB) end -->
+  </body>
+  </html>

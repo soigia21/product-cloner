@@ -1,0 +1,130 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-children-best-friends-forever-ver-02-personalized-acrylic-plaque-birthday-gift-for-mom-daughters-son-fam251101dgtl-01?s=rec&w=p",
+  "parsed": {
+    "handle": "mother-and-children-best-friends-forever-ver-02-personalized-acrylic-plaque-birthday-gift-for-mom-daughters-son-fam251101dgtl-01",
+    "shopDomain": "46338f-fd.myshopify.com",
+    "shopifyProductId": "43211400511644"
+  },
+  "unifiedStats": {
+    "rawOptions": 1608,
+    "normalizedOptions": 804,
+    "removedByNormalize": 804,
+    "aliases": 0
+  },
+  "keyDiffs": {
+    "riskyAliasMappings": [],
+    "rawTextVisibilityMatrix": [
+      {
+        "countLabel": "2",
+        "countValueId": "1",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "3",
+        "countValueId": "2",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "4",
+        "countValueId": "3",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "5",
+        "countValueId": "4",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "6",
+        "countValueId": "5",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      }
+    ],
+    "normalizedTextVisibilityMatrix": [
+      {
+        "countLabel": "2",
+        "countValueId": "1",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "3",
+        "countValueId": "2",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "4",
+        "countValueId": "3",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "5",
+        "countValueId": "4",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      },
+      {
+        "countLabel": "6",
+        "countValueId": "5",
+        "visibleTextCount": 0,
+        "visibleTextOptions": [],
+        "textHolderCount": 0
+      }
+    ],
+    "transformGap": {
+      "stats": {
+        "total": 89,
+        "withRotation": 0,
+        "withSkew": 0,
+        "withFlip": 0,
+        "withClipPath": 0,
+        "withMaskPath": 0,
+        "withPerspective": 0
+      },
+      "rendererCurrentlySupports": {
+        "center": true,
+        "size": true,
+        "rotation": true,
+        "opacity": true,
+        "skew": false,
+        "flip": false,
+        "clipPath": false,
+        "maskPath": false,
+        "perspective": false
+      }
+    }
+  },
+  "suspectFiles": [
+    {
+      "file": "server/services/customily-importer.js",
+      "area": "normalizeOptions() merge of unconditional duplicates + alias remap",
+      "reason": "Can collapse options and alter condition graph / mapping identity."
+    },
+    {
+      "file": "server/services/visibility-engine.js",
+      "area": "shouldAutoDefault() and recursive visibility cascade",
+      "reason": "May auto-select too aggressively, causing options to appear before user intent."
+    },
+    {
+      "file": "server/services/preview-renderer.js",
+      "area": "image draw transform support",
+      "reason": "Currently does not apply skew/flip/clip/mask/perspective fields from design holders."
+    }
+  ]
+}

@@ -1,0 +1,164 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-daughter-bff-forever-personalized-acrylic-photo-plaque-mom131104dgtl?s=rec&w=p",
+  "customilyProductId": "fd80b953-56b1-4bcf-a1d7-5bb6eebad863",
+  "canvas": {
+    "width": 800,
+    "height": 800,
+    "bgColor": null
+  },
+  "textLayers": [],
+  "imageLayers": [
+    {
+      "id": 3,
+      "uuid": "7c520973-d34f-4440-99f1-de3b1e886e91",
+      "centerX": 400,
+      "centerY": 400,
+      "width": 800,
+      "height": 800,
+      "rotation": 0,
+      "zIndex": 0,
+      "opacity": 1,
+      "staticImage": null,
+      "dynamicImages": [
+        {
+          "index": 1,
+          "path": "/Content/product-images/76c4b248-efb7-4ef2-a533-4d023a19d40e.png",
+          "url": "https://cdn.customily.com/Content/product-images/76c4b248-efb7-4ef2-a533-4d023a19d40e.png",
+          "localPath": "assets/layers/layer_3_dynamic_1.png"
+        }
+      ],
+      "staticLocalPath": null
+    },
+    {
+      "id": 1,
+      "uuid": "cf3479be-d59b-47cc-ba24-d54a2f0896c6",
+      "centerX": 400.47,
+      "centerY": 441.6,
+      "width": 349.47,
+      "height": 334.35,
+      "rotation": 0,
+      "zIndex": 1,
+      "opacity": 1,
+      "staticImage": null,
+      "dynamicImages": [],
+      "staticLocalPath": null
+    },
+    {
+      "id": 2,
+      "uuid": "4b240052-d5d4-4d4a-a953-58bfd7a4dd17",
+      "centerX": 400,
+      "centerY": 400,
+      "width": 800,
+      "height": 800,
+      "rotation": 0,
+      "zIndex": 2,
+      "opacity": 1,
+      "staticImage": null,
+      "dynamicImages": [
+        {
+          "index": 1,
+          "path": "/Content/product-images/a8a66b2c-90c6-45d8-b9cc-f7de1d074e74.png",
+          "url": "https://cdn.customily.com/Content/product-images/a8a66b2c-90c6-45d8-b9cc-f7de1d074e74.png",
+          "localPath": "assets/layers/layer_2_dynamic_1.png"
+        },
+        {
+          "index": 5,
+          "path": "/Content/product-images/fdfc53a1-9eb0-4f28-ab81-e27f59cd8f73.png",
+          "url": "https://cdn.customily.com/Content/product-images/fdfc53a1-9eb0-4f28-ab81-e27f59cd8f73.png",
+          "localPath": "assets/layers/layer_2_dynamic_5.png"
+        },
+        {
+          "index": 4,
+          "path": "/Content/product-images/140ec734-0a7f-4162-ba91-669ef00d2734.png",
+          "url": "https://cdn.customily.com/Content/product-images/140ec734-0a7f-4162-ba91-669ef00d2734.png",
+          "localPath": "assets/layers/layer_2_dynamic_4.png"
+        },
+        {
+          "index": 3,
+          "path": "/Content/product-images/e9799610-9ca4-4997-9f80-faf1de1ea7ee.png",
+          "url": "https://cdn.customily.com/Content/product-images/e9799610-9ca4-4997-9f80-faf1de1ea7ee.png",
+          "localPath": "assets/layers/layer_2_dynamic_3.png"
+        },
+        {
+          "index": 2,
+          "path": "/Content/product-images/e20ada48-55ca-495c-b6d0-248a9d7b6a41.png",
+          "url": "https://cdn.customily.com/Content/product-images/e20ada48-55ca-495c-b6d0-248a9d7b6a41.png",
+          "localPath": "assets/layers/layer_2_dynamic_2.png"
+        }
+      ],
+      "staticLocalPath": null
+    }
+  ],
+  "options": [
+    {
+      "id": 2,
+      "label": "Choose Quote",
+      "type": "Dropdown",
+      "required": true,
+      "values": [
+        {
+          "id": 0,
+          "value": "Mother And Daughter From The Start...",
+          "label": "Mother And Daughter From The Start...",
+          "sortId": 1,
+          "selected": true,
+          "productId": null,
+          "thumbnailUrl": null,
+          "bgColor": null
+        },
+        {
+          "id": 1,
+          "value": "Mother And Daughters From The Start...",
+          "label": "Mother And Daughters From The Start...",
+          "sortId": 2,
+          "selected": false,
+          "productId": null,
+          "thumbnailUrl": null,
+          "bgColor": null
+        },
+        {
+          "id": 2,
+          "value": "Mother And Son From The Start...",
+          "label": "Mother And Son From The Start...",
+          "sortId": 3,
+          "selected": false,
+          "productId": null,
+          "thumbnailUrl": null,
+          "bgColor": null
+        },
+        {
+          "id": 3,
+          "value": "Mother And Sons From The Start...",
+          "label": "Mother And Sons From The Start...",
+          "sortId": 4,
+          "selected": false,
+          "productId": null,
+          "thumbnailUrl": null,
+          "bgColor": null
+        },
+        {
+          "id": 4,
+          "value": "Mother And Children From The Start...",
+          "label": "Mother And Children From The Start...",
+          "sortId": 5,
+          "selected": false,
+          "productId": null,
+          "thumbnailUrl": null,
+          "bgColor": null
+        }
+      ],
+      "conditions": [],
+      "linkedLayerIds": []
+    },
+    {
+      "id": 1,
+      "label": "Upload Your Photo",
+      "type": "Image Upload",
+      "required": true,
+      "values": [],
+      "conditions": [],
+      "linkedLayerIds": []
+    }
+  ],
+  "fonts": []
+}

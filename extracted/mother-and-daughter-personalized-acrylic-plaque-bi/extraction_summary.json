@@ -1,0 +1,25 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl",
+  "customilyProductId": "6b03e69f-b491-4ecf-b043-c9e62f35d687",
+  "canvas": {
+    "width": 800,
+    "height": 800,
+    "bgColor": "rgba(27,38,49,1)"
+  },
+  "layersCount": 13,
+  "textLayersCount": 2,
+  "optionsCount": 280,
+  "downloaded": {
+    "layers": 109,
+    "swatches": 4656,
+    "fonts": 1,
+    "errors": []
+  },
+  "outputDir": "/Users/tvo/Customize App/product-cloner/extracted/mother-and-daughter-personalized-acrylic-plaque-bi",
+  "files": {
+    "appConfig": "app_config.json",
+    "rawProductConfig": "raw_product_config.json",
+    "rawUnifiedSettings": "raw_unified_settings.json",
+    "assetsDir": "assets/"
+  }
+}

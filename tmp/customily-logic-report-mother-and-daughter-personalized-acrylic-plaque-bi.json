@@ -1,0 +1,147 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl",
+  "parsed": {
+    "handle": "mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl",
+    "shopDomain": "46338f-fd.myshopify.com",
+    "shopifyProductId": "43212230459548"
+  },
+  "unifiedUrl": "https://sh.customily.com/api/settings/unified/mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl?shop=46338f-fd.myshopify.com&productId=43212230459548",
+  "unifiedStats": {
+    "options": 280,
+    "textInputOptions": 10,
+    "imageOptions": 194,
+    "conditionedOptions": 278,
+    "desiredValueArrays": 556
+  },
+  "customilyScripts": [
+    "https://macorner.co/cdn/shop/t/45/assets/customily-custom.js?v=89696905422084176991770029307?v=1001",
+    "https://cdn.customily.com/customily.js",
+    "https://cdn.customily.com/shopify/static/customily.shopify.script.unified.js"
+  ],
+  "bundleReports": [
+    {
+      "src": "https://macorner.co/cdn/shop/t/45/assets/customily-custom.js?v=89696905422084176991770029307?v=1001",
+      "size": 3619,
+      "sha256": "686e608b265bda5f0f5775139b6fcb9c90fa2469bc45e70d7992668648c562ac",
+      "keywordHits": {
+        "desired_value": false,
+        "watch_option": false,
+        "combination_operator": false,
+        "sort_id": false,
+        "text_id": false,
+        "image_id": false,
+        "/api/settings/unified/": false,
+        "/api/Product/GetProduct": false
+      },
+      "snippets": {}
+    },
+    {
+      "src": "https://cdn.customily.com/customily.js",
+      "size": 1115387,
+      "sha256": "d5f9cecd92b3b00fbbb262d922b0d18936ed0a1f8d72bfd3c4e3f817f841984d",
+      "keywordHits": {
+        "desired_value": false,
+        "watch_option": false,
+        "combination_operator": false,
+        "sort_id": false,
+        "text_id": false,
+        "image_id": false,
+        "/api/settings/unified/": false,
+        "/api/Product/GetProduct": true
+      },
+      "snippets": {
+        "/api/Product/GetProduct": "return n.apply(this,arguments)}}())},cancelAllPendingUploads:O},E=i(10),T={getProduct:function(t){return Object(v.b)(\"\".concat(m.a.baseUrl,\"/api/Product/GetProduct\"),{productId:t,clientVersion:m.a.clientVersion,useListEPS:!0})}},P=\"\".concat(m.a.baseUrl,\"/api\"),A={shareCustomization:function(t,e,i,r,n,o"
+      }
+    },
+    {
+      "src": "https://cdn.customily.com/shopify/static/customily.shopify.script.unified.js",
+      "size": 1033529,
+      "sha256": "65377040c909cfc7af466d59dad05db2af976094255402ed8602713debfa5b40",
+      "keywordHits": {
+        "desired_value": true,
+        "watch_option": true,
+        "combination_operator": true,
+        "sort_id": true,
+        "text_id": true,
+        "image_id": true,
+        "/api/settings/unified/": false,
+        "/api/Product/GetProduct": false
+      },
+      "snippets": {
+        "desired_value": "value||\"string\"===typeof r.value&&\"\"!=r.value&&t.id===Number(r.value)||\"number\"===typeof r.value&&t.id==r.value}))),n=!!e&&(Array.isArray(t.desired_value)?t.desired_value.includes(-1)||t.desired_value.includes(e.id):e.id==t.desired_value);else if(\"Text Input\"===r.type){const e=t.operator,o=St",
+        "watch_option": "et s=0;s<e.conditions.length;s++){const t=e.conditions[s];0==s&&(i=t.action);const r=this.disableOptBinarySearch?a.options.find(e=>e.id===t.watch_option):qi(a.options,t.watch_option);if(r){if(r.isVisible){let e;if(\"Swatch\"===r.type||\"Text Swatch\"===r.type||\"Dropdown\"===r.type||\"Dropdown Swat",
+        "combination_operator": "has_exactly_length\"===e&&(n=String(r.value).length===parseInt(o))}\"Checkbox\"===r.type&&(n=r.value==t.desired_value)}else n=!1;if(s>0){if(!t.combination_operator){n=!0;continue}\"and\"===t.combination_operator&&(n=!(!n||!o)),\"or\"===t.combination_operator&&(n=!(!n&&!o))}o=n}else n=!0}else n=!0;i||(n=!0)",
+        "sort_id": "tchContainerStyle(),attrs:{role:\"radiogroup\",tabindex:\"0\"},on:{keydown:function(e){return t.onKeyDown(e)}}},t._l(t.orderBy(t.option.values,\"sort_id\"),(function(e,i){return o(\"div\",{key:e.id,staticClass:\"customily-swatch\",class:t.swatchClassName},[o(\"input\",{directives:[{name:\"model\",raw",
+        "text_id": "t.type}));if(i)for(const o of i){const i=Ni(this.disableOptConflictDetection?this.sets:this.setsOptionsVisible,t,e.id,t=>\"text\"===t.type&&t.text_id==o.text_id);this.engraverTexts[Number(o.text_id)]&&!i.length&&(n.default.set(this.engraverTexts[Number(o.text_id)],\"value\",\"\"),(null===(s=w",
+        "image_id": "d 0:e.currentProduct)||void 0===o?void 0:o.preview)||void 0===i?void 0:i.imagePlaceHoldersPreview)||[]).some(e=>e.id===Number(t.file_upload_image_id)&&(e.RemoveBackground||e.CustomilyRemoveBackground||e.CustomilyImageFilter||e.CustomilyFaceCutOut||e.cartoonize||e.CutoutFace||e.removeBack"
+      }
+    }
+  ],
+  "localProductFound": true,
+  "localDiagnostics": {
+    "textHolderCollisionsByVariantCount": [
+      {
+        "countLabel": "Mother & 1 Daughter",
+        "countValueId": "0",
+        "collisions": 0,
+        "visibleTextOptions": 2,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 2 Daughters",
+        "countValueId": "1",
+        "collisions": 0,
+        "visibleTextOptions": 3,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 3 Daughters",
+        "countValueId": "2",
+        "collisions": 0,
+        "visibleTextOptions": 4,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 4 Daughters",
+        "countValueId": "3",
+        "collisions": 0,
+        "visibleTextOptions": 5,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 5 Daughters",
+        "countValueId": "4",
+        "collisions": 0,
+        "visibleTextOptions": 6,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 6 Daughters",
+        "countValueId": "5",
+        "collisions": 0,
+        "visibleTextOptions": 7,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 7 Daughters",
+        "countValueId": "6",
+        "collisions": 0,
+        "visibleTextOptions": 8,
+        "hiddenSelected": 0
+      },
+      {
+        "countLabel": "Mother & 8 Daughters",
+        "countValueId": "7",
+        "collisions": 0,
+        "visibleTextOptions": 9,
+        "hiddenSelected": 0
+      }
+    ],
+    "hiddenWithSelectionRisk": 0
+  },
+  "mismatchHypotheses": [
+    "Local renderer remap text by visual order can differ from Customily text_id binding order.",
+    "Local renderer normalizes text size across same line; Customily binds size per holder.",
+    "Local renderer applies text y-offset and width shrink heuristics that can shift visual output."
+  ]
+}

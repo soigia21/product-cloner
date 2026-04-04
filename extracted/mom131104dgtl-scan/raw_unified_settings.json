@@ -1,0 +1,422 @@
+{
+  "sets": [
+    {
+      "id": "85660bb9-db9e-466a-8f36-196e96d6083d",
+      "optionset_id": 841051,
+      "title": "MOM131104DGTL",
+      "options": [
+        {
+          "id": 2,
+          "type": "Dropdown",
+          "label": "Choose Quote",
+          "values": [
+            {
+              "id": 0,
+              "value": "Mother And Daughter From The Start...",
+              "sort_id": 1,
+              "selected": true
+            },
+            {
+              "id": 1,
+              "value": "Mother And Daughters From The Start...",
+              "sort_id": 2,
+              "selected": false
+            },
+            {
+              "id": 2,
+              "value": "Mother And Son From The Start...",
+              "sort_id": 3,
+              "selected": false
+            },
+            {
+              "id": 3,
+              "value": "Mother And Sons From The Start...",
+              "sort_id": 4,
+              "selected": false
+            },
+            {
+              "id": 4,
+              "value": "Mother And Children From The Start...",
+              "sort_id": 5,
+              "selected": false
+            }
+          ],
+          "checked": false,
+          "sort_id": 1,
+          "optionId": -1,
+          "required": true,
+          "functions": [
+            {
+              "id": 1,
+              "type": "image",
+              "text_id": "4",
+              "image_id": "2"
+            }
+          ],
+          "help_text": "",
+          "libraryId": 0,
+          "option_id": -1,
+          "add_chains": false,
+          "conditions": [],
+          "max_length": 20,
+          "is_textarea": false,
+          "placeholder": "",
+          "hide_visually": false,
+          "variation_conditions": []
+        },
+        {
+          "id": 1,
+          "type": "Image Upload",
+          "label": "Upload Your Photo",
+          "checked": false,
+          "sort_id": 2,
+          "optionId": -1,
+          "required": true,
+          "functions": [],
+          "help_text": "1- CROP images before uploading and help you better photos. Images with large pixels and a high resolution work best.\n2- Click the SELECT IMAGE button to upload your photo or re-upload other photos if you want.\n3- Adjust the position or zoom level of a photo, then click on the \"REVIEW\" button\n",
+          "libraryId": 0,
+          "option_id": -1,
+          "add_chains": false,
+          "conditions": [],
+          "is_textarea": false,
+          "hide_visually": false,
+          "file_upload_image_id": "1",
+          "variation_conditions": []
+        }
+      ],
+      "sections": [],
+      "shop": "",
+      "createdFromTemplate": null,
+      "forDesignTemplate": false,
+      "linked": true
+    }
+  ],
+  "productHandle": "mother-and-daughter-bff-forever-personalized-acrylic-photo-plaque-mom131104dgtl",
+  "productConfig": {
+    "printful": {},
+    "printify": {},
+    "variations": [
+      {
+        "id": 10057058582684,
+        "name": "Style",
+        "values": [
+          {
+            "value": "Acrylic Table Sign"
+          }
+        ],
+        "position": 1,
+        "functions": [],
+        "conditions": []
+      },
+      {
+        "id": 10057058615452,
+        "name": "Size",
+        "values": [
+          {
+            "value": "6\" x 8\"",
+            "product_id": "fd80b953-56b1-4bcf-a1d7-5bb6eebad863"
+          },
+          {
+            "value": "4\" x 6\"",
+            "product_id": "28423f80-fcbd-497f-af7f-882aa0f73d0f"
+          },
+          {
+            "value": "7.5\" x 10\"",
+            "product_id": "fd80b953-56b1-4bcf-a1d7-5bb6eebad863"
+          }
+        ],
+        "position": 2,
+        "functions": [
+          {
+            "id": 1,
+            "type": "product"
+          }
+        ],
+        "conditions": []
+      }
+    ],
+    "hidePreview": false,
+    "assignedSets": [
+      {
+        "id": "85660bb9-db9e-466a-8f36-196e96d6083d",
+        "options": [],
+        "sort_id": 1,
+        "variation_conditions": []
+      }
+    ],
+    "providerInfo": {},
+    "conf_variants": [
+      {
+        "id": 43210647634076,
+        "option1": "Acrylic Table Sign",
+        "option2": "6\" x 8\"",
+        "option3": null
+      },
+      {
+        "id": 43210647666844,
+        "option1": "Acrylic Table Sign",
+        "option2": "4\" x 6\"",
+        "option3": null
+      },
+      {
+        "id": 43210647699612,
+        "option1": "Acrylic Table Sign",
+        "option2": "7.5\" x 10\"",
+        "option3": null
+      }
+    ],
+    "initial_product_id": ""
+  },
+  "settings": {
+    "enabled": true,
+    "customJs": "window.customilyShopify = window.customilyShopify || {};\nwindow.customilyShopify.livePreviewMode = true;\nwindow.customilyShopify.canvasPositioned = false;\nwindow.customilyShopify.livePreviewBeforeGallery = true;\nwindow.customilyShopify.hideAllPropsPrefix = '_';\nwindow.customilyShopify.hideAllProps = true;\nwindow.customilyShopify.skipThumbGeneration = true;\nwindow.customilyShopify.preview = window.customilyShopify.preview || {};\nwindow.customilyShopify.preview.preventShowWhenSetsLoad = true;\nwindow.customilyShopify.hooks = window.customilyShopify.hooks || {};\nwindow.customilyShopify.hooks.canvas = {\n    displayCanvas: function () {\n        if (!window.customilyShopify.canvasPositioned) {\n            $('.gallery-wrap').prepend($('.canvas-wrapper'));\n\n            var imgHeight = $('.canvas-wrapper').next().find('.flickity-viewport').height();\n\n            $('#customily-custom-css').remove();\n            const d = document.createElement('div');\n            d.id = 'customily-custom-css';\n            d.innerHTML = '<style> .customily-img-container{ height: ' + imgHeight + 'px !important; } </style>';\n            document.head.appendChild(d);\n\n            window.customilyShopify.canvasPositioned = true;\n        }\n\n        $('.canvas-wrapper').siblings().filter('.product_gallery_nav')\n            .data('customily-hidden', true).addClass('customily-height0')\n            .removeClass('customily-img-container');\n        $('.canvas-wrapper').next().find('.flickity-viewport').addClass('customily-height0')\n            .removeClass('customily-img-container');\n        $('.canvas-wrapper').siblings().filter('.product_gallery')\n            .hide();\n        $('.canvas-wrapper').siblings().filter('.product_gallery_nav')\n            .hide();\n        $('.canvas-wrapper').data('customily-visible', true);\n        $('.canvas-wrapper').fadeIn();\n    }\n};\n\nwindow.addEventListener('customily-options-loaded', function(){\n    fixCustomizationVariants();\n});\n\nfunction fixCustomizationVariants() {\n    const url = window.location.href;\n    const urlObj = new URL(url);\n    if (urlObj.searchParams.has('customizationId')) {\n        const selectedVariants = $('.swatch_options input:checked');\n        selectedVariants.each(function () {\n            $(this).parent().find('input').first().click();\n            const $this = $(this);\n            setTimeout(function () {\n                $this.click();\n            }, 1)\n        });\n    }\n}",
+    "dropdown": {
+      "size": "medium",
+      "color": "rgba(114,88,224,1)",
+      "sizePx": 32,
+      "squared": true,
+      "enableSearch": false
+    },
+    "swatches": {
+      "size": "custom",
+      "color": "rgba(241,101,35,1)",
+      "sizePx": 76,
+      "squared": true
+    },
+    "useModal": false,
+    "customCss": "#cl_optionsapp {\n    width: 100%!important;\n    background-color: #f7f7f7;\n    border: 1px solid #CCCCCC;\n    border-radius: 3px; \n    padding: 10px !important;\n}\n#customily-options {\n   width: 100% !important;\n}\n#cl_optionsapp select, #cl_optionsapp input:not([type='checkbox']) {\n   border-radius: 5px!important;\n}\n\n.customily_option {\n    width: 100% !important;\n    flex-wrap: wrap;\n    justify-content: flex-start !important;\n}\n\n.customily_option >*{\n    margin-right: 0px !important;\n}\n\n.customily_option > input {\n    max-width: 100%;\n}\n\n#customily-options select, #customily-options input {\n    border: 1px solid #d5d5d5 !important;\n    border-radius: 1px !important;\n    padding-left: 15px !important;\n    font-size: 13px;\n    height: 38px;\n    line-height: 25px;\n    width: 100% !important;\n    background: #fff;\n}\n#cl_optionsapp .swatch-container .swatch {\n    margin: 3px 3px !important;\n}\n@media (\u001d\u001dmax-width: 320px) {\n  #cl_optionsapp .swatch-container .swatch {\n    margin: 3px 7px !important;\n  } \n}\n@media (\u001dmin-width: 375px) and (max-width: 399px) {\n   #cl_optionsapp .swatch-container .swatch {\n    margin: 3px 3px !important;\n  } \n}\n@media  (\u001dmax-width: 400px) and (max-width: 420px) {\n   #cl_optionsapp .swatch-container .swatch {\n    margin: 3px 8px !important;\n  } \n}\n\n\n#customily-options input::placeholder{\n    color: #777;\n}\n#cl_optionsapp .customily_option{\n  margin-bottom: 0px !important ;\n}\n#cl_optionsapp .customily_option label .option_name {\n    text-transform: none;\n}\n#cl_optionsapp .customily_option input[type='checkbox'] {\n    min-width: 16px !important;\n    min-height: 16px !important;\n    max-width: 16px !important;\n    max-height: 16px !important;\n    margin-top: 3px;\n}\n#cl_optionsapp .customily_option input:not([type='checkbox']), #cl_optionsapp .customily_option select {\n    min-height: 45px !important;\n}\n#customily-options select {\n    background: url(//cdn.shopify.com/s/files/1/0035/5876/8707/t/2/assets/select-arrow.png?896572340288148682) no-repeat right #fff;\n}\n\n@media (max-width: 767.98px) {\n    .customily_option.cl-has-checkbox .cl-option-content {\n      margin-left: 5px;\n    }\n    \n}\n\n#customily-options label{\n    font-size: 0.8rem;\n    color: #415e70;\n    margin-top: 1em;\n    width: 100%;\n}\n\n#customily-options .swatch-container label, .customily-file-input label{\n    margin-top: 0px!important;\n}\n\n#customily-options .tooltip{\n    top: unset!important;\n    right: unset!important;\n}\n\n#customily-options .tooltip:before{\n    display: none!important;\n}\n\n#customily-options .swatch-container label{\n    width: 60px !important;\n    height: 60px !important;\n}\n\n#cl_optionsapp .swatch-container label img{\n  \twidth: 56px !important;\n}  \n\n.swatch.customily-swatch:checked + label {\n    border: 1px solid darkblue !important;\n    background: unset !important;\n}\n\n.customily-download-button {\n  background-color: transparent;\n  border: 1px solid #9d8661;\n  color: #9d8661;\n  padding: 0 20px;\n  text-align: center;\n  cursor: pointer;\n  min-height: 44px;\n  height: 40px;\n  line-height: 1.2;\n  vertical-align: top;\n  font-family: Dosis, sans-serif;\n  font-weight: normal;\n  font-style: normal;\n  font-size: 15px;\n  text-transform: uppercase;\n  letter-spacing: 1px;\n  display: -webkit-inline-box;\n  display: -webkit-inline-flex;\n  display: -moz-inline-flex;\n  display: -ms-inline-flexbox;\n  display: inline-flex;\n  -webkit-align-items: center;\n  -moz-align-items: center;\n  -ms-align-items: center;\n  align-items: center;\n  -webkit-justify-content: center;\n  -moz-justify-content: center;\n  -ms-justify-content: center;\n  justify-content: center;\n  -ms-flex-pack: center;\n  transition: all 0.2s linear;\n  -webkit-appearance: none;\n  -webkit-font-smoothing: antialiased;\n  -moz-osx-font-smoothing: grayscale;\n  font-smoothing: antialiased;\n}\n\n.customily-download-button:hover {\n  background: #9d8661;\n  color: #ffffff;\n  border: 1px solid #9d8661;\n}\n  \n\n\n\n\n#cl_optionsapp .swatch-container input:checked ~ label{\n\tborder-color: rgb(47, 128, 237) !important;\n}\n#cl_optionsapp .swatch-container input:checked ~ label:before{\n    content: \"\";\n    position: absolute;\n    right: 5px;\n    bottom: 8px;\n    background: url(https://cdn.shopify.com/s/files/1/0406/8750/1474/files/check-mark.svg?v=1600044901);\n    background-repeat: no-repeat;\n    background-size: cover;\n    width: 12px;\n    height: 12px;\n}\n#cl_optionsapp .swatch-container input[type=\"checkbox\"]:checked{\n    content: \" \";\n    position: absolute;\n    right: 5px;\n    bottom: 8px;\n    background: url(https://cdn.shopify.com/s/files/1/0406/8750/1474/files/check-mark.svg?v=1600044901);\n    background-repeat: no-repeat;\n    background-size: cover;\n    width: 12px;\n    height: 12px;\n    z-index: 999;\n}\n.customily-preview-button{\n    width: 100% !important;\n    background: #fff !important;\n    color: #2b2a2a !important;\n    font-weight: 500 !important;\n    font-size: 18px;\n    margin-top: 10px !important;\n    margin-bottom: 20px !important;\n    -webkit-text-fill-color: #2b2a2a !important;\n}\n #cl_optionsapp .customily_option input:not([type='checkbox']), #cl_optionsapp .customily_option select {\n    text-overflow: ellipsis;\n    overflow: hidden;\n}\n#cl_optionsapp .customily_option select option{\n    text-overflow: ellipsis;\n    overflow: hidden;\n    white-space: nowrap;\n}\n@media (max-width: 767.98px){\n  #cl_optionsapp select, #cl_optionsapp input:not([type='checkbox']) {\n    font-size: 13px !important;\n  }\n  \n}\n#cl_optionsapp .help-text {\n    color: #353535!important;\n    margin-top: 11px;\n}\n#customily-options label {\n  font-size: 12px!important;\n}\n@media (max-width: 393px){\n.customily-mobile-controls>div {\n    max-width: 35px !important;\n }\n}\n.ld-over-inverse.running:before, .ld-over-full.running:before, .ld-over-full-inverse.running:before {\n  z-index: 2 !important;\n}",
+    "debugMode": false,
+    "hoverZoom": false,
+    "touchZoom": false,
+    "tooltipType": "custom",
+    "zoomBtnText": "",
+    "addOrderNotes": false,
+    "buttonsStyles": {
+      "share": {
+        "styles": {
+          "fontSize": "16",
+          "fontColor": "rgba(0,0,0,1)",
+          "borderColor": "rgba(72,172,231,1)",
+          "borderWidth": "5",
+          "borderRadius": "8",
+          "backgroundColor": "rgba(255,255,255,1)"
+        },
+        "customize": false
+      },
+      "upload": {
+        "styles": {
+          "fontSize": "16",
+          "fontColor": "rgba(0,0,0,1)",
+          "borderColor": "rgba(72,172,231,1)",
+          "borderWidth": "5",
+          "borderRadius": "8",
+          "backgroundColor": "rgba(255,255,255,1)"
+        },
+        "customize": false,
+        "showThumbnails": false
+      },
+      "preview": {
+        "styles": {
+          "fontSize": "16",
+          "fontColor": "rgba(0,0,0,1)",
+          "borderColor": "rgba(72,172,231,1)",
+          "borderWidth": "5",
+          "borderRadius": "8",
+          "backgroundColor": "rgba(255,255,255,1)"
+        },
+        "customize": false
+      },
+      "addToCart": {
+        "styles": {
+          "fontSize": "16",
+          "fontColor": "rgba(0,0,0,1)",
+          "borderColor": "rgba(72,172,231,1)",
+          "borderWidth": "5",
+          "borderRadius": "8",
+          "backgroundColor": "rgba(255,255,255,1)"
+        },
+        "customize": false
+      },
+      "personalize": {
+        "styles": {
+          "fontSize": "16",
+          "fontColor": "rgba(0,0,0,1)",
+          "borderColor": "rgba(72,172,231,1)",
+          "borderWidth": "5",
+          "borderRadius": "8",
+          "backgroundColor": "rgba(255,255,255,1)"
+        },
+        "customize": false
+      },
+      "replace": {
+        "replaceBtnText": ""
+      }
+    },
+    "sideHoverZoom": false,
+    "stickyPreview": true,
+    "builtInGallery": {
+      "mobile": {
+        "enabled": false,
+        "thumbnailsLayout": "bottom",
+        "allowSwiping": false
+      },
+      "desktop": {
+        "enabled": false,
+        "thumbnailsLayout": "bottom",
+        "allowSwiping": false
+      }
+    },
+    "dropdownSwatch": {
+      "size": "medium",
+      "color": "rgba(114,88,224,1)",
+      "sizePx": 32,
+      "squared": true
+    },
+    "mobileControls": true,
+    "mobileUseModal": false,
+    "modalScrollbar": true,
+    "realtimeRender": true,
+    "useLivePreview": true,
+    "shareButtonText": "Share Customization",
+    "useThemeScripts": true,
+    "accordionOptions": false,
+    "previewButtonText": "Preview",
+    "enableEngraverLogs": false,
+    "priceQuerySelector": "",
+    "preventEdgeResizing": false,
+    "requiredMessageText": "Required",
+    "shareButtonCssClass": "",
+    "showPreviewVariants": false,
+    "stickyPreviewMobile": false,
+    "uploadedImageCovers": false,
+    "exportProductionFile": true,
+    "generatePreviewImage": true,
+    "mobileUseLivePreview": true,
+    "removeSwatchesBorder": false,
+    "showPreviewByDefault": false,
+    "dontCreateNewSessions": false,
+    "personalizeButtonText": "Personalize",
+    "renameProdFilePattern": "",
+    "allowMobileTouchEvents": true,
+    "optionsBackgroundColor": null,
+    "salePriceQuerySelector": "",
+    "enablePersonalizeButton": false,
+    "optionalPersonalization": {
+      "enable": false,
+      "dividerColor": "#cccccc",
+      "backgroundColor": "#edefee"
+    },
+    "previewButtonMobileText": "Show Preview",
+    "showPreviewButtonMobile": false,
+    "keepEngraverControlsSize": false,
+    "requiredMessageTextColor": "rgba(255,0,0,1)",
+    "enableEditPersonalization": false,
+    "enableSavePersonalization": true,
+    "stickyPreviewButtonMobile": false,
+    "uploadUserImagesToShopify": false,
+    "enableSharePersonalization": false,
+    "previewButtonNeedsRequired": false,
+    "enableStoredPersonalization": false,
+    "removeEventsFromProductForm": false,
+    "showLivePreviewPreviewButton": false,
+    "addRenamedProdFileAdditionalNotes": false,
+    "optionsPosition": {
+      "positioning": 0,
+      "selector": ""
+    },
+    "upSellStyles": {
+      "title": {
+        "fontColor": "rgba(0,0,0,1)",
+        "fontSize": "16"
+      },
+      "product": {
+        "fontColor": "rgba(0,0,0,1)",
+        "fontSize": "16"
+      }
+    },
+    "addToCartIntoPreviewModal": false,
+    "customCurrency": "",
+    "querySelectors": {
+      "price": {
+        "regular": "",
+        "sale": ""
+      },
+      "cart": {
+        "popup": {
+          "element": "",
+          "properties": ""
+        },
+        "page": {
+          "element": "",
+          "properties": ""
+        }
+      }
+    },
+    "cartItems": {
+      "personalizationLink": false,
+      "previewModal": false,
+      "personalizedThumbnail": true,
+      "showSuggestions": true,
+      "groupAddOns": false,
+      "hideDeleteButtonOnAddOns": true,
+      "hideQuantityButtonsOnAddOns": true,
+      "texts": {
+        "editLink": "",
+        "previewLink": ""
+      },
+      "loadWhenCartOpen": false,
+      "hideLineItemProperties": false
+    },
+    "showMobileControls": false,
+    "buttonsLayout": {
+      "desktop": {
+        "custom": false,
+        "layout": "q_p_c"
+      },
+      "mobile": {
+        "custom": false,
+        "layout": "q_p_c"
+      }
+    },
+    "useShadowRoot": false,
+    "reflectShadowRootOnVariant": false,
+    "addToCart": {
+      "useAjax": false,
+      "triggerStoreButtonClick": true,
+      "reloadPageAfterAtc": false,
+      "openCartDrawerAfterAtc": false,
+      "cartDrawerQuerySelector": "",
+      "urlToRedirectAfterAtc": "",
+      "eventsToDispatchBeforeAtc": "",
+      "eventsToDispatchAfterAtc": "",
+      "storeCartData": false
+    },
+    "promptStoredPersonalization": false,
+    "zoomBtnType": "textButton",
+    "enableCollapsibleOptionsMenu": false,
+    "showAddToCartButtonAlwaysPresent": true,
+    "upsell": {
+      "enabled": false,
+      "interceptClicks": false,
+      "scaleAddonsWithMainProduct": false
+    },
+    "uploadImage": {
+      "zoomSelection": false,
+      "disableZoomOnImageUpload": false,
+      "imageOverlaySelection": false,
+      "canvasImageLoading": false,
+      "cropBtnText": "Crop",
+      "doneCropeBtnText": "Done",
+      "crop": {
+        "customize": false,
+        "styles": {}
+      },
+      "done": {
+        "customize": false,
+        "styles": {}
+      }
+    },
+    "useFutureExport": true,
+    "renameProdFile": false
+  }
+}

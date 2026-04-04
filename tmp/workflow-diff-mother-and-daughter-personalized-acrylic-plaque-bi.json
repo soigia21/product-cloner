@@ -1,0 +1,698 @@
+{
+  "productUrl": "https://macorner.co/products/mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl",
+  "parsed": {
+    "handle": "mother-and-daughter-personalized-acrylic-plaque-birthday-gift-mothers-day-gift-for-mom-daughters-fam100201hptl",
+    "shopDomain": "46338f-fd.myshopify.com",
+    "shopifyProductId": "43212230459548"
+  },
+  "unifiedStats": {
+    "rawOptions": 280,
+    "normalizedOptions": 280,
+    "removedByNormalize": 0,
+    "aliases": 0
+  },
+  "keyDiffs": {
+    "riskyAliasMappings": [],
+    "rawTextVisibilityMatrix": [
+      {
+        "countLabel": "Mother & 1 Daughter",
+        "countValueId": "0",
+        "visibleTextCount": 2,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          }
+        ],
+        "textHolderCount": 2
+      },
+      {
+        "countLabel": "Mother & 2 Daughters",
+        "countValueId": "1",
+        "visibleTextCount": 4,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          }
+        ],
+        "textHolderCount": 3
+      },
+      {
+        "countLabel": "Mother & 3 Daughters",
+        "countValueId": "2",
+        "visibleTextCount": 5,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          }
+        ],
+        "textHolderCount": 4
+      },
+      {
+        "countLabel": "Mother & 4 Daughters",
+        "countValueId": "3",
+        "visibleTextCount": 6,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          }
+        ],
+        "textHolderCount": 5
+      },
+      {
+        "countLabel": "Mother & 5 Daughters",
+        "countValueId": "4",
+        "visibleTextCount": 7,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          }
+        ],
+        "textHolderCount": 6
+      },
+      {
+        "countLabel": "Mother & 6 Daughters",
+        "countValueId": "5",
+        "visibleTextCount": 8,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          }
+        ],
+        "textHolderCount": 7
+      },
+      {
+        "countLabel": "Mother & 7 Daughters",
+        "countValueId": "6",
+        "visibleTextCount": 9,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          },
+          {
+            "id": "195",
+            "label": "Daughter's Name #7",
+            "sort": 221
+          }
+        ],
+        "textHolderCount": 8
+      },
+      {
+        "countLabel": "Mother & 8 Daughters",
+        "countValueId": "7",
+        "visibleTextCount": 10,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          },
+          {
+            "id": "195",
+            "label": "Daughter's Name #7",
+            "sort": 221
+          },
+          {
+            "id": "218",
+            "label": "Daughter's Name #8",
+            "sort": 251
+          }
+        ],
+        "textHolderCount": 9
+      }
+    ],
+    "normalizedTextVisibilityMatrix": [
+      {
+        "countLabel": "Mother & 1 Daughter",
+        "countValueId": "0",
+        "visibleTextCount": 2,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          }
+        ],
+        "textHolderCount": 2
+      },
+      {
+        "countLabel": "Mother & 2 Daughters",
+        "countValueId": "1",
+        "visibleTextCount": 4,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          }
+        ],
+        "textHolderCount": 3
+      },
+      {
+        "countLabel": "Mother & 3 Daughters",
+        "countValueId": "2",
+        "visibleTextCount": 5,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          }
+        ],
+        "textHolderCount": 4
+      },
+      {
+        "countLabel": "Mother & 4 Daughters",
+        "countValueId": "3",
+        "visibleTextCount": 6,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          }
+        ],
+        "textHolderCount": 5
+      },
+      {
+        "countLabel": "Mother & 5 Daughters",
+        "countValueId": "4",
+        "visibleTextCount": 7,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          }
+        ],
+        "textHolderCount": 6
+      },
+      {
+        "countLabel": "Mother & 6 Daughters",
+        "countValueId": "5",
+        "visibleTextCount": 8,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          }
+        ],
+        "textHolderCount": 7
+      },
+      {
+        "countLabel": "Mother & 7 Daughters",
+        "countValueId": "6",
+        "visibleTextCount": 9,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          },
+          {
+            "id": "195",
+            "label": "Daughter's Name #7",
+            "sort": 221
+          }
+        ],
+        "textHolderCount": 8
+      },
+      {
+        "countLabel": "Mother & 8 Daughters",
+        "countValueId": "7",
+        "visibleTextCount": 10,
+        "visibleTextOptions": [
+          {
+            "id": "28",
+            "label": "Mother's Name",
+            "sort": 6
+          },
+          {
+            "id": "164",
+            "label": "Daughter's Name ",
+            "sort": 35
+          },
+          {
+            "id": "41",
+            "label": "Daughter's Name #1",
+            "sort": 36
+          },
+          {
+            "id": "68",
+            "label": "Daughter's Name #2",
+            "sort": 71
+          },
+          {
+            "id": "91",
+            "label": "Daughter's Name #3",
+            "sort": 101
+          },
+          {
+            "id": "114",
+            "label": "Daughter's Name #4",
+            "sort": 131
+          },
+          {
+            "id": "158",
+            "label": "Daughter's Name #5",
+            "sort": 161
+          },
+          {
+            "id": "172",
+            "label": "Daughter's Name #6",
+            "sort": 191
+          },
+          {
+            "id": "195",
+            "label": "Daughter's Name #7",
+            "sort": 221
+          },
+          {
+            "id": "218",
+            "label": "Daughter's Name #8",
+            "sort": 251
+          }
+        ],
+        "textHolderCount": 9
+      }
+    ],
+    "transformGap": {
+      "stats": {
+        "total": 13,
+        "withRotation": 4,
+        "withSkew": 0,
+        "withFlip": 0,
+        "withClipPath": 0,
+        "withMaskPath": 0,
+        "withPerspective": 0
+      },
+      "rendererCurrentlySupports": {
+        "center": true,
+        "size": true,
+        "rotation": true,
+        "opacity": true,
+        "skew": false,
+        "flip": false,
+        "clipPath": false,
+        "maskPath": false,
+        "perspective": false
+      }
+    }
+  },
+  "suspectFiles": [
+    {
+      "file": "server/services/customily-importer.js",
+      "area": "normalizeOptions() merge of unconditional duplicates + alias remap",
+      "reason": "Can collapse options and alter condition graph / mapping identity."
+    },
+    {
+      "file": "server/services/visibility-engine.js",
+      "area": "shouldAutoDefault() and recursive visibility cascade",
+      "reason": "May auto-select too aggressively, causing options to appear before user intent."
+    },
+    {
+      "file": "server/services/preview-renderer.js",
+      "area": "image draw transform support",
+      "reason": "Currently does not apply skew/flip/clip/mask/perspective fields from design holders."
+    }
+  ]
+}
