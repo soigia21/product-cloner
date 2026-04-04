@@ -819,6 +819,7 @@ export function listProducts() {
           optionsCount: data.options?.length || 0,
           variantsCount: Object.keys(data.variantDesigns || {}).length,
           shopifyClone: data.shopifyClone || null,
+          cloneSource: data.cloneSource || null,
           importedAt: data.importedAt,
         });
       } catch {}

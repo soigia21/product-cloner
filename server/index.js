@@ -40,6 +40,19 @@ function buildCloneMetadataFromResult(result = {}) {
   };
 }
 
+function buildCloneSourceFromScraped(scrapedProduct = {}, sourceUrl = "") {
+  const firstVariant = scrapedProduct?.variants?.[0] || {};
+  const firstImage = scrapedProduct?.images?.[0] || {};
+  return {
+    title: scrapedProduct?.title || "",
+    price: firstVariant?.price || "",
+    compareAtPrice: firstVariant?.compareAtPrice || null,
+    variantsCount: Array.isArray(scrapedProduct?.variants) ? scrapedProduct.variants.length : 0,
+    image: firstImage?.src || "",
+    sourceUrl: sourceUrl || "",
+  };
+}
+
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -216,7 +229,8 @@ app.post("/api/import", async (req, res) => {
     const tokenInfo = await getToken();
     const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, { status: "draft" });
     const shopifyClone = buildCloneMetadataFromResult(draftResult);
-    updateProductMetadata(importedProduct.id, { shopifyClone });
+    const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
+    updateProductMetadata(importedProduct.id, { shopifyClone, cloneSource });
 
     res.json({
       success: true,
@@ -225,6 +239,7 @@ app.post("/api/import", async (req, res) => {
         optionsCount: importedProduct.options.length,
         variantsCount: Object.keys(importedProduct.variantDesigns).length,
         shopifyClone,
+        cloneSource,
       },
     });
   } catch (error) {
@@ -248,19 +263,24 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
   try {
     const tokenInfo = await getToken();
     let result = null;
+    let scraped = null;
     const existingProductId = String(product.shopifyClone?.productId || "").replace(/[^0-9]/g, "");
     if (existingProductId) {
       result = await updateProductStatus(cfg.storeDomain, tokenInfo.accessToken, existingProductId, "draft");
     } else {
-      const scraped = await scrapeProduct(product.url);
+      scraped = await scrapeProduct(product.url);
       result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scraped, { status: "draft" });
     }
 
+    const cloneSource = product.cloneSource || (scraped ? buildCloneSourceFromScraped(scraped, product.url) : null);
     const shopifyClone = {
       ...(product.shopifyClone || {}),
       ...buildCloneMetadataFromResult(result),
     };
-    updateProductMetadata(product.id, { shopifyClone });
+    updateProductMetadata(product.id, {
+      shopifyClone,
+      ...(cloneSource ? { cloneSource } : {}),
+    });
     res.json({ success: true, productId: product.id, shopifyClone });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

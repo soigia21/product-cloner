@@ -82,6 +82,7 @@ export default function CustomizerPage() {
   const canvasRef = useRef(null);
   const previewRequestRef = useRef(0);
   const previewAbortRef = useRef(null);
+  const cloneSummaryRef = useRef(null);
   const imagePromiseCacheRef = useRef(new Map());
   const imageMetaByPathRef = useRef(new Map());
   const fontFamilyCacheRef = useRef(new Map());
@@ -539,7 +540,12 @@ export default function CustomizerPage() {
         // Refresh products list
         await refreshProducts();
         // Auto-select the imported product
-        if (data.product?.id) selectProduct(data.product.id);
+        if (data.product?.id) {
+          await selectProduct(data.product.id);
+          setTimeout(() => {
+            cloneSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 60);
+        }
       } else {
         setError(data.error || "Import thất bại");
       }
@@ -1344,39 +1350,61 @@ export default function CustomizerPage() {
       )}
 
       {activeProductRecord && (
-        <div className="products-toolbar" style={{ gap: 10, flexWrap: "wrap" }}>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={handleSaveDraft}
-            disabled={savingDraft || publishingProduct || deletingProductId === activeProductRecord.id}
-          >
-            {savingDraft ? "Đang lưu..." : "Save Draft"}
-          </button>
-          <button
-            className="btn btn-success btn-sm"
-            onClick={handlePublishProduct}
-            disabled={
-              savingDraft ||
-              publishingProduct ||
-              !activeProductRecord?.shopifyClone?.productId ||
-              String(activeProductRecord?.shopifyClone?.status || "").toLowerCase() === "active"
-            }
-          >
-            {publishingProduct ? "Đang publish..." : "Public Product"}
-          </button>
-          {activeProductRecord?.shopifyClone?.productUrl ? (
-            <a
-              className="btn btn-ghost btn-sm"
-              href={activeProductRecord.shopifyClone.productUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Mở Shopify Admin
-            </a>
-          ) : null}
-          <span className="badge badge-info">
-            Shopify: {activeProductRecord?.shopifyClone?.status || "not-created"}
-          </span>
+        <div className="clone-summary-card" ref={cloneSummaryRef}>
+          <div className="clone-summary-media">
+            {activeProductRecord?.cloneSource?.image ? (
+              <img src={activeProductRecord.cloneSource.image} alt={activeProductRecord?.cloneSource?.title || "Product image"} />
+            ) : (
+              <div className="clone-summary-placeholder">No image</div>
+            )}
+          </div>
+
+          <div className="clone-summary-content">
+            <div className="clone-summary-title-row">
+              <h3>{activeProductRecord?.cloneSource?.title || activeProductRecord?.shopifyClone?.productTitle || activeProductRecord.id}</h3>
+              <span className="badge badge-info">
+                Shopify: {activeProductRecord?.shopifyClone?.status || "not-created"}
+              </span>
+            </div>
+
+            <div className="clone-summary-meta">
+              <span>💵 {activeProductRecord?.cloneSource?.price || "-"}</span>
+              <span>🎭 {activeProductRecord?.cloneSource?.variantsCount || activeProductRecord?.variantsCount || 0} variants</span>
+              <span>🆔 {activeProductRecord?.shopifyClone?.productId || "-"}</span>
+            </div>
+
+            <div className="clone-summary-actions">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={handleSaveDraft}
+                disabled={savingDraft || publishingProduct || deletingProductId === activeProductRecord.id}
+              >
+                {savingDraft ? "Đang lưu..." : "Save Draft"}
+              </button>
+              <button
+                className="btn btn-success btn-sm"
+                onClick={handlePublishProduct}
+                disabled={
+                  savingDraft ||
+                  publishingProduct ||
+                  !activeProductRecord?.shopifyClone?.productId ||
+                  String(activeProductRecord?.shopifyClone?.status || "").toLowerCase() === "active"
+                }
+              >
+                {publishingProduct ? "Đang publish..." : "Public Product"}
+              </button>
+              {activeProductRecord?.shopifyClone?.productUrl ? (
+                <a
+                  className="btn btn-ghost btn-sm"
+                  href={activeProductRecord.shopifyClone.productUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Mở Shopify Admin
+                </a>
+              ) : null}
+            </div>
+          </div>
         </div>
       )}
 
