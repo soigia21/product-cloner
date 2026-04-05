@@ -116,6 +116,7 @@ async function applyDefaultInventoryLevels(store, accessToken, productPayload = 
  */
 export async function createProduct(store, accessToken, product, options = {}) {
   const status = options?.status === "active" ? "active" : "draft";
+  const forcePhysicalProduct = options?.forcePhysicalProduct === true;
   const defaultInventoryQuantity = normalizeInventoryQuantity(
     options?.defaultInventoryQuantity,
     DEFAULT_IMPORTED_INVENTORY_QUANTITY
@@ -131,6 +132,7 @@ export async function createProduct(store, accessToken, product, options = {}) {
       product_type: product.productType || undefined,
       tags: Array.isArray(product.tags) ? product.tags.join(", ") : product.tags || "",
       status,
+      published_scope: status === "active" ? "global" : undefined,
       // Options
       options: product.options.length > 0
         ? product.options.map((opt) => ({ name: opt.name, values: opt.values }))
@@ -146,7 +148,7 @@ export async function createProduct(store, accessToken, product, options = {}) {
         option3: v.option3 || undefined,
         weight: v.weight || 0,
         weight_unit: v.weightUnit || "kg",
-        requires_shipping: v.requiresShipping ?? true,
+        requires_shipping: forcePhysicalProduct ? true : (v.requiresShipping ?? true),
         taxable: v.taxable ?? true,
         inventory_management: v.inventoryManagement || "shopify",
         inventory_policy: v.inventoryPolicy || "continue",
@@ -226,6 +228,7 @@ export async function updateProductStatus(store, accessToken, productId, status)
     product: {
       id: Number(numericId),
       status: nextStatus,
+      published_scope: nextStatus === "active" ? "global" : undefined,
     },
   };
 

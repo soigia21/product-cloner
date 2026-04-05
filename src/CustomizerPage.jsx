@@ -122,6 +122,7 @@ export default function CustomizerPage() {
   const draggingRef = useRef(null);
   const resizeRef = useRef(null);
   const rotateRef = useRef(null);
+  const lastParentPreviewTsRef = useRef(0);
 
   const [error, setError] = useState(null);
 
@@ -350,6 +351,49 @@ export default function CustomizerPage() {
     };
   };
 
+  const emitPreviewToParent = useCallback((canvas) => {
+    if (!isEmbedded || typeof window === "undefined" || !canvas) return;
+    if (window.parent === window) return;
+
+    const now = Date.now();
+    if (now - lastParentPreviewTsRef.current < 280) return;
+    lastParentPreviewTsRef.current = now;
+
+    try {
+      const width = Number(canvas.width) || 0;
+      const height = Number(canvas.height) || 0;
+      if (width <= 0 || height <= 0) return;
+
+      const MAX_EDGE = 960;
+      let source = canvas;
+      if (Math.max(width, height) > MAX_EDGE) {
+        const ratio = MAX_EDGE / Math.max(width, height);
+        const nextW = Math.max(1, Math.round(width * ratio));
+        const nextH = Math.max(1, Math.round(height * ratio));
+        const mini = document.createElement("canvas");
+        mini.width = nextW;
+        mini.height = nextH;
+        const mctx = mini.getContext("2d");
+        if (mctx) {
+          mctx.drawImage(canvas, 0, 0, nextW, nextH);
+          source = mini;
+        }
+      }
+
+      const previewUrl = source.toDataURL("image/jpeg", 0.88);
+      window.parent.postMessage(
+        {
+          type: "product-cloner:preview-updated",
+          templateId: String(activeProduct || embeddedContext.templateId || ""),
+          previewUrl,
+          width,
+          height,
+        },
+        "*"
+      );
+    } catch { }
+  }, [isEmbedded, activeProduct, embeddedContext.templateId]);
+
   const drawTraceToCanvas = useCallback(async (trace, requestId = null) => {
     const canvas = canvasRef.current;
     if (!canvas || !trace?.canvas) return;
@@ -557,7 +601,8 @@ export default function CustomizerPage() {
       setPreviewAspectRatio(outputWidth / outputHeight);
     }
     setHasCanvasFrame(true);
-  }, [getFontFamily, getImage, uploadTransformsByHolderId]);
+    emitPreviewToParent(canvas);
+  }, [getFontFamily, getImage, uploadTransformsByHolderId, emitPreviewToParent]);
 
   const refreshProducts = useCallback(async () => {
     const listRes = await fetch("/api/products");

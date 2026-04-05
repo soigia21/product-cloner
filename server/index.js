@@ -247,6 +247,7 @@ app.post("/api/clone", async (req, res) => {
     const tokenInfo = await getToken();
     const result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, product, {
       defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+      forcePhysicalProduct: true,
     });
     res.json(result);
   } catch (error) {
@@ -391,6 +392,7 @@ app.post("/api/import", async (req, res) => {
     const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, {
       status: "draft",
       defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+      forcePhysicalProduct: true,
     });
     const shopifyClone = buildCloneMetadataFromResult(draftResult);
     const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
@@ -460,6 +462,7 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
       result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scraped, {
         status: "draft",
         defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+        forcePhysicalProduct: true,
       });
     }
 
