@@ -5,7 +5,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { scrapeProduct } from "./services/product-scraper.js";
-import { createProduct, updateProductStatus } from "./services/product-creator.js";
+import { createProduct, updateProductStatus, upsertProductTemplateMetafield } from "./services/product-creator.js";
 import { extractCustomilyProduct } from "./services/customily-extractor.js";
 import {
   importProduct,
@@ -51,6 +51,122 @@ function buildCloneSourceFromScraped(scrapedProduct = {}, sourceUrl = "") {
     image: firstImage?.src || "",
     sourceUrl: sourceUrl || "",
   };
+}
+
+function normalizeNumericShopifyId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const gidMatch = raw.match(/Product\/(\d+)/i);
+  if (gidMatch) return gidMatch[1];
+  return raw.replace(/[^0-9]/g, "");
+}
+
+function isTruthyParam(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+}
+
+function getRequestOrigin(req) {
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || "")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = String(req.headers["x-forwarded-host"] || "")
+    .split(",")[0]
+    .trim();
+  const proto = forwardedProto || req.protocol || "https";
+  const host = forwardedHost || req.get("host");
+  return `${proto}://${host}`;
+}
+
+function buildStorefrontTemplatePayload(product, req, options = {}) {
+  const includeRaw = Boolean(options.includeRaw);
+  const productId = encodeURIComponent(product.id);
+  const origin = getRequestOrigin(req);
+  const fonts = {};
+  for (const [sourcePath, localPath] of Object.entries(product.fonts || {})) {
+    const baseName = path.basename(String(localPath || ""));
+    if (!baseName) continue;
+    fonts[sourcePath] = `${origin}/api/products/${productId}/fonts/${encodeURIComponent(baseName)}`;
+  }
+
+  const template = {
+    id: product.id,
+    url: product.url,
+    handle: product.handle,
+    shopDomain: product.shopDomain,
+    publicDomain: product.publicDomain,
+    shopifyProductId: product.shopifyProductId,
+    defaultDesignUUID: product.defaultDesignUUID,
+    variantDesigns: product.variantDesigns || {},
+    options: product.options || [],
+    optionAliases: product.optionAliases || {},
+    settings: product.settings || {},
+    productConfig: product.productConfig || {},
+    libraryDIPs: product.libraryDIPs || {},
+    fonts,
+    importedAt: product.importedAt || null,
+  };
+
+  if (includeRaw) {
+    return {
+      ...template,
+      rawProduct: {
+        ...product,
+        fonts,
+      },
+    };
+  }
+
+  return template;
+}
+
+function resolveTemplateFromQuery(query = {}) {
+  const templateId = String(query.template_id || "").trim();
+  if (templateId) {
+    const byTemplate = loadProduct(templateId);
+    if (byTemplate) return byTemplate;
+  }
+
+  const productId = normalizeNumericShopifyId(query.product_id || query.productId || query.id);
+  const handle = String(query.handle || "").trim().toLowerCase();
+  const products = listProducts();
+
+  for (const summary of products) {
+    const candidate = loadProduct(summary.id);
+    if (!candidate) continue;
+
+    if (productId) {
+      const candidateProductId = normalizeNumericShopifyId(
+        candidate.shopifyClone?.productId || candidate.shopifyProductId
+      );
+      if (candidateProductId && candidateProductId === productId) return candidate;
+    }
+
+    if (handle) {
+      const sourceHandle = String(candidate.handle || "").toLowerCase();
+      const cloneHandle = String(candidate.shopifyClone?.productHandle || "").toLowerCase();
+      if (handle === sourceHandle || handle === cloneHandle) return candidate;
+    }
+  }
+
+  return null;
+}
+
+async function syncTemplateMetafieldToShopify(templateId, shopifyProductId) {
+  const cfg = getShopifyConfig();
+  if (!cfg.configured) {
+    throw new Error("Chưa cấu hình Shopify store");
+  }
+  const normalizedProductId = normalizeNumericShopifyId(shopifyProductId);
+  if (!normalizedProductId) {
+    throw new Error("Invalid Shopify product id");
+  }
+  const tokenInfo = await getToken();
+  return upsertProductTemplateMetafield(
+    cfg.storeDomain,
+    tokenInfo.accessToken,
+    normalizedProductId,
+    templateId
+  );
 }
 
 app.use(cors());
@@ -230,7 +346,24 @@ app.post("/api/import", async (req, res) => {
     const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, { status: "draft" });
     const shopifyClone = buildCloneMetadataFromResult(draftResult);
     const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
-    updateProductMetadata(importedProduct.id, { shopifyClone, cloneSource });
+    const warnings = [];
+    let templateMetafield = null;
+    try {
+      templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, draftResult.productId);
+    } catch (metaError) {
+      warnings.push(`Không thể sync metafield personalizer.template_id: ${metaError.message}`);
+    }
+
+    updateProductMetadata(importedProduct.id, {
+      shopifyClone,
+      cloneSource,
+      personalizer: templateMetafield
+        ? {
+          metafield: templateMetafield,
+          templateId: importedProduct.id,
+        }
+        : undefined,
+    });
 
     res.json({
       success: true,
@@ -240,7 +373,9 @@ app.post("/api/import", async (req, res) => {
         variantsCount: Object.keys(importedProduct.variantDesigns).length,
         shopifyClone,
         cloneSource,
+        templateMetafield,
       },
+      warnings,
     });
   } catch (error) {
     console.error("Import error:", error);
@@ -277,11 +412,27 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
       ...(product.shopifyClone || {}),
       ...buildCloneMetadataFromResult(result),
     };
-    updateProductMetadata(product.id, {
+    const warnings = [];
+    let templateMetafield = null;
+    try {
+      templateMetafield = await syncTemplateMetafieldToShopify(product.id, shopifyClone.productId);
+    } catch (metaError) {
+      warnings.push(`Không thể sync metafield personalizer.template_id: ${metaError.message}`);
+    }
+
+    const patch = {
       shopifyClone,
       ...(cloneSource ? { cloneSource } : {}),
-    });
-    res.json({ success: true, productId: product.id, shopifyClone });
+    };
+    if (templateMetafield) {
+      patch.personalizer = {
+        metafield: templateMetafield,
+        templateId: product.id,
+      };
+    }
+
+    updateProductMetadata(product.id, patch);
+    res.json({ success: true, productId: product.id, shopifyClone, templateMetafield, warnings });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -320,11 +471,73 @@ app.post("/api/products/:id/publish", async (req, res) => {
 });
 
 /**
+ * POST /api/products/:id/sync-template-metafield
+ * Force sync personalizer.template_id metafield for an imported template + Shopify product.
+ */
+app.post("/api/products/:id/sync-template-metafield", async (req, res) => {
+  const product = loadProduct(req.params.id);
+  if (!product) return res.status(404).json({ success: false, error: "Product not found" });
+
+  const shopifyProductId = normalizeNumericShopifyId(
+    req.body?.shopifyProductId || product.shopifyClone?.productId
+  );
+  if (!shopifyProductId) {
+    return res.status(400).json({
+      success: false,
+      error: "Missing Shopify product id. Create draft first.",
+    });
+  }
+
+  try {
+    const metafield = await syncTemplateMetafieldToShopify(product.id, shopifyProductId);
+    updateProductMetadata(product.id, {
+      personalizer: {
+        metafield,
+        templateId: product.id,
+      },
+    });
+    res.json({ success: true, templateId: product.id, shopifyProductId, metafield });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/products — List imported products
  */
 app.get("/api/products", (req, res) => {
   res.json({ success: true, products: listProducts() });
 });
+
+/**
+ * GET /api/storefront/template
+ * GET /apps/personalizer/template (App Proxy alias)
+ * Resolve personalized template JSON by:
+ * 1) template_id metafield value
+ * 2) Shopify product id
+ * 3) product handle
+ */
+function handleStorefrontTemplateRequest(req, res) {
+  const product = resolveTemplateFromQuery(req.query || {});
+  if (!product) {
+    return res.status(404).json({
+      success: false,
+      error: "Template not found",
+      hint: "Pass template_id or product_id/handle",
+    });
+  }
+
+  const includeRaw = isTruthyParam(req.query?.full || req.query?.raw);
+  const payload = buildStorefrontTemplatePayload(product, req, { includeRaw });
+  return res.json({
+    success: true,
+    templateId: product.id,
+    template: payload,
+  });
+}
+
+app.get("/api/storefront/template", handleStorefrontTemplateRequest);
+app.get("/apps/personalizer/template", handleStorefrontTemplateRequest);
 
 /**
  * DELETE /api/products/:id — Delete one imported product

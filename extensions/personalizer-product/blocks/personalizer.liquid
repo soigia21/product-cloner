@@ -1,0 +1,87 @@
+{% liquid
+  assign metafield_template_id = product.metafields.personalizer.template_id.value
+  if metafield_template_id == blank
+    assign metafield_template_id = product.metafields.personalizer.template_id
+  endif
+%}
+
+<div
+  class="pz-theme-block"
+  data-personalizer-block
+  data-template-id="{{ metafield_template_id | escape }}"
+  data-product-id="{{ product.id }}"
+  data-product-handle="{{ product.handle | escape }}"
+  data-proxy-prefix="{{ block.settings.app_proxy_prefix | escape }}"
+  data-app-base-url="{{ block.settings.app_base_url | escape }}"
+  data-show-debug="{{ block.settings.show_debug }}"
+>
+  <div class="pz-status pz-status--idle">Personalizer is initializing...</div>
+</div>
+
+<style>
+  .pz-theme-block {
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
+    margin: 0 0 18px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .pz-status {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #111827;
+  }
+  .pz-status--loading {
+    color: #334155;
+  }
+  .pz-status--error {
+    color: #b42318;
+  }
+  .pz-status--ok {
+    color: #027a48;
+  }
+  .pz-debug {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #475467;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px;
+  }
+</style>
+
+<script src="{{ 'personalizer-block.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Personalizer Block",
+  "target": "section",
+  "templates": ["product"],
+  "settings": [
+    {
+      "type": "text",
+      "id": "app_proxy_prefix",
+      "label": "App proxy prefix",
+      "default": "/apps/personalizer",
+      "info": "Set empty if not using app proxy."
+    },
+    {
+      "type": "text",
+      "id": "app_base_url",
+      "label": "Fallback app URL",
+      "default": "https://product-cloner.groupaliens.com",
+      "info": "Used when App proxy prefix is empty."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_debug",
+      "label": "Show debug summary",
+      "default": false
+    }
+  ]
+}
+{% endschema %}
