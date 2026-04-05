@@ -1,8 +1,22 @@
 (function productClonerThemeBlock() {
   "use strict";
 
-  function byId(id) {
-    return typeof id === "string" ? document.getElementById(id) : null;
+  const EMBED_EVENT = "product-cloner:embedded-resize";
+  const MIN_HEIGHT = 640;
+  const MAX_HEIGHT = 2200;
+  const DEFAULT_HEIGHT = 1180;
+  const iframeByWindow = new Map();
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function trimSlash(value) {
+    return String(value || "").replace(/\/+$/, "");
+  }
+
+  function parseBoolean(value) {
+    return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
   }
 
   function getStatusNode(root) {
@@ -16,32 +30,36 @@
     node.textContent = String(text || "");
   }
 
-  function setDebug(root, payload) {
-    if (String(root.dataset.showDebug || "").toLowerCase() !== "true") return;
+  function ensureDebugNode(root) {
     let debugNode = root.querySelector(".pz-debug");
     if (!debugNode) {
       debugNode = document.createElement("pre");
       debugNode.className = "pz-debug";
       root.appendChild(debugNode);
     }
+    return debugNode;
+  }
+
+  function setDebug(root, payload) {
+    if (!parseBoolean(root.dataset.showDebug)) return;
+    const debugNode = ensureDebugNode(root);
     debugNode.textContent = JSON.stringify(payload, null, 2);
   }
 
-  function trimSlash(value) {
-    return String(value || "").replace(/\/+$/, "");
-  }
+  function buildEmbedUrl(root) {
+    const appBase = trimSlash(root.dataset.appBaseUrl);
+    if (!appBase) return null;
 
-  function getTemplateEndpoint(root) {
-    const proxyPrefix = trimSlash(root.dataset.proxyPrefix);
-    if (proxyPrefix) return `${proxyPrefix}/template`;
+    let url;
+    try {
+      url = new URL(`${appBase}/`, window.location.origin);
+    } catch {
+      return null;
+    }
 
-    const appBaseUrl = trimSlash(root.dataset.appBaseUrl);
-    if (appBaseUrl) return `${appBaseUrl}/api/storefront/template`;
-    return "";
-  }
+    const params = url.searchParams;
+    params.set("embedded", "1");
 
-  function buildQuery(root) {
-    const params = new URLSearchParams();
     const templateId = String(root.dataset.templateId || "").trim();
     const productId = String(root.dataset.productId || "").trim();
     const productHandle = String(root.dataset.productHandle || "").trim();
@@ -49,82 +67,51 @@
     if (templateId) params.set("template_id", templateId);
     if (productId) params.set("product_id", productId);
     if (productHandle) params.set("handle", productHandle);
-    return params;
+    return url;
   }
 
-  async function mountRoot(root) {
+  function bindIframeResize(iframe, expectedOrigin) {
+    if (!iframe?.contentWindow) return;
+    iframeByWindow.set(iframe.contentWindow, { iframe, expectedOrigin });
+  }
+
+  function mountRoot(root) {
     if (!root || root.dataset.pzMounted === "1") return;
     root.dataset.pzMounted = "1";
 
-    const endpoint = getTemplateEndpoint(root);
-    if (!endpoint) {
-      setStatus(
-        root,
-        "Missing endpoint. Set App proxy prefix or fallback app URL in block settings.",
-        "pz-status--error"
-      );
+    const embedUrl = buildEmbedUrl(root);
+    if (!embedUrl) {
+      setStatus(root, "Missing app_base_url for embedded personalizer.", "pz-status--error");
       return;
     }
 
-    const query = buildQuery(root);
-    if (!query.get("template_id") && !query.get("product_id") && !query.get("handle")) {
-      setStatus(root, "Missing template_id/product_id/handle for personalization.", "pz-status--error");
-      return;
-    }
+    setStatus(root, "Loading personalized customizer...", "pz-status--loading");
 
-    const url = `${endpoint}?${query.toString()}`;
-    setStatus(root, "Loading personalized template...", "pz-status--loading");
+    const shell = document.createElement("div");
+    shell.className = "pz-embed-shell";
 
-    try {
-      const response = await fetch(url, { credentials: "include" });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      if (!payload?.success || !payload?.template) {
-        throw new Error(payload?.error || "Template payload is invalid");
-      }
+    const iframe = document.createElement("iframe");
+    iframe.className = "pz-embed-frame";
+    iframe.loading = "lazy";
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
+    iframe.allow = "clipboard-read; clipboard-write";
+    iframe.src = embedUrl.toString();
+    iframe.style.height = `${DEFAULT_HEIGHT}px`;
+    shell.appendChild(iframe);
+    root.appendChild(shell);
 
-      const template = payload.template;
-      const optionsCount = Array.isArray(template.options) ? template.options.length : 0;
-      const variantsCount = Object.keys(template.variantDesigns || {}).length;
-      setStatus(
-        root,
-        `Personalized template loaded (${optionsCount} options, ${variantsCount} variant designs).`,
-        "pz-status--ok"
-      );
+    bindIframeResize(iframe, embedUrl.origin);
 
-      root.__personalizerTemplate = template;
-      root.dataset.pzTemplateId = String(payload.templateId || template.id || "");
+    iframe.addEventListener("load", () => {
+      bindIframeResize(iframe, embedUrl.origin);
+      setStatus(root, "Personalized UI loaded.", "pz-status--ok");
       setDebug(root, {
-        templateId: payload.templateId || template.id || "",
-        source: {
-          handle: template.handle || "",
-          productId: template.shopifyProductId || root.dataset.productId || "",
-        },
-        optionsCount,
-        variantsCount,
+        src: iframe.src,
+        templateId: root.dataset.templateId || "",
+        productId: root.dataset.productId || "",
+        handle: root.dataset.productHandle || "",
       });
-
-      window.__PRODUCT_CLONER_TEMPLATES = window.__PRODUCT_CLONER_TEMPLATES || {};
-      if (root.dataset.pzTemplateId) {
-        window.__PRODUCT_CLONER_TEMPLATES[root.dataset.pzTemplateId] = template;
-      }
-
-      root.dispatchEvent(
-        new CustomEvent("product-cloner:template-loaded", {
-          bubbles: true,
-          detail: {
-            templateId: root.dataset.pzTemplateId,
-            template,
-            endpoint: url,
-          },
-        })
-      );
-    } catch (error) {
-      setStatus(root, `Cannot load personalized template: ${error.message}`, "pz-status--error");
-      setDebug(root, { error: error.message, endpoint: url });
-    }
+    });
   }
 
   function mountAll() {
@@ -134,15 +121,21 @@
     }
   }
 
+  window.addEventListener("message", (event) => {
+    const payload = event?.data;
+    if (!payload || payload.type !== EMBED_EVENT) return;
+
+    const linked = iframeByWindow.get(event.source);
+    if (!linked?.iframe) return;
+    if (linked.expectedOrigin && event.origin !== linked.expectedOrigin) return;
+
+    const nextHeight = clamp(Number(payload.height) || DEFAULT_HEIGHT, MIN_HEIGHT, MAX_HEIGHT);
+    linked.iframe.style.height = `${nextHeight}px`;
+  });
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", mountAll, { once: true });
   } else {
     mountAll();
-  }
-
-  const appSectionMain = byId("MainContent");
-  if (appSectionMain) {
-    const observer = new MutationObserver(() => mountAll());
-    observer.observe(appSectionMain, { childList: true, subtree: true });
   }
 })();

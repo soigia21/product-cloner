@@ -1,22 +1,22 @@
 # Theme App Extension: Product Personalizer
 
-## 1) Data flow
+## 1) Data flow (embedded full UI)
 
 - Import product ở app admin:
   - Tạo Shopify Draft.
   - Auto sync metafield `personalizer.template_id = <imported-template-id>`.
 - Trên storefront product page:
   - App block đọc `product.metafields.personalizer.template_id`.
-  - Block JS gọi endpoint:
-    - App proxy: `/apps/personalizer/template`
-    - Hoặc direct API: `https://product-cloner.groupaliens.com/api/storefront/template`
-  - Endpoint trả `template` (dữ liệu từ `data/products/<id>/product.json`).
+  - Block mount `iframe` tới app URL:
+    - `https://product-cloner.groupaliens.com/?embedded=1&template_id=...`
+  - Iframe render full personalized UI (options/conditional/preview canvas/upload) bằng logic hiện tại của app.
 
 ## 2) Files added
 
 - `extensions/personalizer-product/shopify.extension.toml`
 - `extensions/personalizer-product/blocks/personalizer.liquid`
 - `extensions/personalizer-product/assets/personalizer-block.js`
+- `src/CustomizerPage.jsx` (embedded mode)
 
 ## 3) API endpoints
 
@@ -40,16 +40,13 @@ Trong Shopify Dev Dashboard của app:
 
 - Vào product template.
 - Add block: `Personalizer Block`.
-- Mặc định block dùng app proxy `/apps/personalizer`.
-- Nếu chưa cấu hình app proxy:
-  - Set `App proxy prefix` = empty.
-  - Set `Fallback app URL` = `https://product-cloner.groupaliens.com`.
+- Set `Fallback app URL` = `https://product-cloner.groupaliens.com`.
+- Block sẽ nhúng full UI bằng iframe embedded mode.
 
 ## 6) Test nhanh
 
 1. Import 1 product mới trong app admin.
 2. Verify product draft có metafield `personalizer.template_id`.
 3. Mở storefront PDP có gắn block.
-4. Check block báo `Personalized template loaded (...)`.
-5. Mở console:
-   - `window.__PRODUCT_CLONER_TEMPLATES` có template data.
+4. Check block báo `Personalized UI loaded`.
+5. UI personalized hiển thị đầy đủ trong iframe (preview canvas + options conditional + upload).

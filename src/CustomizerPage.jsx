@@ -53,6 +53,26 @@ function ZoomGlyph({ mode = "minus" }) {
  * Right: Dynamic customizer form
  */
 export default function CustomizerPage() {
+  const embeddedContext = useMemo(() => {
+    if (typeof window === "undefined") {
+      return {
+        embedded: false,
+        templateId: "",
+        productId: "",
+        handle: "",
+      };
+    }
+    const qs = new URLSearchParams(window.location.search);
+    return {
+      embedded:
+        ["1", "true", "yes", "on"].includes(String(qs.get("embedded") || "").toLowerCase()),
+      templateId: String(qs.get("template_id") || "").trim(),
+      productId: String(qs.get("product_id") || "").trim(),
+      handle: String(qs.get("handle") || "").trim(),
+    };
+  }, []);
+  const isEmbedded = Boolean(embeddedContext.embedded);
+
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -93,6 +113,24 @@ export default function CustomizerPage() {
   const rotateRef = useRef(null);
 
   const [error, setError] = useState(null);
+
+  const resolveEmbeddedTemplateId = useCallback(async () => {
+    if (!isEmbedded) return "";
+    if (embeddedContext.templateId) return embeddedContext.templateId;
+
+    if (!embeddedContext.productId && !embeddedContext.handle) return "";
+    try {
+      const qs = new URLSearchParams();
+      if (embeddedContext.productId) qs.set("product_id", embeddedContext.productId);
+      if (embeddedContext.handle) qs.set("handle", embeddedContext.handle);
+      const res = await fetch(`/api/storefront/template?${qs.toString()}`);
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.templateId) return "";
+      return String(data.templateId);
+    } catch {
+      return "";
+    }
+  }, [isEmbedded, embeddedContext.templateId, embeddedContext.productId, embeddedContext.handle]);
 
   const activeProductRecord = useMemo(
     () => products.find((p) => String(p.id) === String(activeProduct || "")) || null,
@@ -507,15 +545,80 @@ export default function CustomizerPage() {
     return listData.products || [];
   }, []);
 
-  // Load products list
+  // Load status + products list (normal mode) OR auto-resolve template (embedded mode)
   useEffect(() => {
-    fetch("/api/status")
-      .then((r) => r.json())
-      .then((data) => setStoreInfo(data))
-      .catch(() => {});
+    let canceled = false;
 
-    refreshProducts().catch(() => { });
-  }, [refreshProducts]);
+    const boot = async () => {
+      if (isEmbedded) {
+        const embeddedTemplateId = await resolveEmbeddedTemplateId();
+        if (canceled) return;
+        if (embeddedTemplateId) {
+          await selectProduct(embeddedTemplateId);
+          return;
+        }
+        setError("Không tìm thấy template personalized cho product này.");
+        return;
+      }
+
+      fetch("/api/status")
+        .then((r) => r.json())
+        .then((data) => {
+          if (!canceled) setStoreInfo(data);
+        })
+        .catch(() => { });
+
+      refreshProducts().catch(() => { });
+    };
+
+    boot().catch(() => {
+      if (!canceled) setError("Không thể khởi tạo personalized UI");
+    });
+
+    return () => {
+      canceled = true;
+    };
+  }, [refreshProducts, isEmbedded, resolveEmbeddedTemplateId]);
+
+  useEffect(() => {
+    if (!isEmbedded || typeof window === "undefined") return undefined;
+    const notifyParent = () => {
+      const h = Math.max(
+        document.documentElement?.scrollHeight || 0,
+        document.body?.scrollHeight || 0,
+        500
+      );
+      window.parent?.postMessage(
+        {
+          type: "product-cloner:embedded-resize",
+          height: Math.ceil(h),
+        },
+        "*"
+      );
+    };
+    notifyParent();
+    const t1 = setTimeout(notifyParent, 120);
+    const t2 = setTimeout(notifyParent, 500);
+    let observer = null;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => notifyParent());
+      observer.observe(document.body);
+      observer.observe(document.documentElement);
+    }
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      observer?.disconnect();
+    };
+  }, [
+    isEmbedded,
+    activeProduct,
+    options.length,
+    visibleOptionIds.length,
+    previewLoading,
+    previewAspectRatio,
+    focusedUploadOptionId,
+  ]);
 
   // Import product
   const handleImport = async () => {
@@ -833,6 +936,11 @@ export default function CustomizerPage() {
       return next;
     });
   };
+
+  useEffect(() => {
+    if (!isEmbedded || !activeProduct || options.length > 0) return;
+    selectProduct(activeProduct).catch(() => { });
+  }, [isEmbedded, activeProduct, options.length]);
 
   const resolveCanvasPointer = (clientX, clientY) => {
     const canvas = canvasRef.current;
@@ -1253,46 +1361,48 @@ export default function CustomizerPage() {
   };
 
   return (
-    <div className="customizer-page">
+    <div className={`customizer-page ${isEmbedded ? "embedded-mode" : ""}`}>
       {/* Import Section */}
-      <div className="import-section">
-        <div className="import-card">
-          <h2>🧩 Product + Personalized Importer</h2>
-          <p className="subtitle">
-            Nhập link sản phẩm Shopify có Customily → Import sẽ tự tạo Shopify Draft
-          </p>
-          {storeInfo?.configured ? (
-            <div className="store-badge" style={{ marginBottom: 10 }}>
-              <span className="dot"></span> Kết nối: {storeInfo.store}
-            </div>
-          ) : (
-            <div className="config-warning" style={{ marginBottom: 10 }}>
-              <span className="config-warning-icon">⚠️</span>
-              <div className="config-warning-text">
-                Chưa cấu hình Shopify store. Cập nhật <code>.env</code> với <code>SHOPIFY_STORE</code> và <code>SHOPIFY_ACCESS_TOKEN</code>.
+      {!isEmbedded && (
+        <div className="import-section">
+          <div className="import-card">
+            <h2>🧩 Product + Personalized Importer</h2>
+            <p className="subtitle">
+              Nhập link sản phẩm Shopify có Customily → Import sẽ tự tạo Shopify Draft
+            </p>
+            {storeInfo?.configured ? (
+              <div className="store-badge" style={{ marginBottom: 10 }}>
+                <span className="dot"></span> Kết nối: {storeInfo.store}
               </div>
+            ) : (
+              <div className="config-warning" style={{ marginBottom: 10 }}>
+                <span className="config-warning-icon">⚠️</span>
+                <div className="config-warning-text">
+                  Chưa cấu hình Shopify store. Cập nhật <code>.env</code> với <code>SHOPIFY_STORE</code> và <code>SHOPIFY_ACCESS_TOKEN</code>.
+                </div>
+              </div>
+            )}
+            <div className="import-bar">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !importing && handleImport()}
+                placeholder="https://macorner.co/products/..."
+                disabled={importing || (storeInfo && !storeInfo.configured)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={handleImport}
+                disabled={!importUrl.trim() || importing || (storeInfo && !storeInfo.configured)}
+              >
+                {importing ? <span className="spinner"></span> : "📥"}
+                {importing ? "Importing..." : "Import + Create Draft"}
+              </button>
             </div>
-          )}
-          <div className="import-bar">
-            <input
-              type="url"
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !importing && handleImport()}
-              placeholder="https://macorner.co/products/..."
-              disabled={importing || (storeInfo && !storeInfo.configured)}
-            />
-            <button
-              className="btn btn-primary"
-              onClick={handleImport}
-              disabled={!importUrl.trim() || importing || (storeInfo && !storeInfo.configured)}
-            >
-              {importing ? <span className="spinner"></span> : "📥"}
-              {importing ? "Importing..." : "Import + Create Draft"}
-            </button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -1305,7 +1415,7 @@ export default function CustomizerPage() {
       )}
 
       {/* Products Grid */}
-      {products.length > 0 && (
+      {!isEmbedded && products.length > 0 && (
         <>
           <div className="products-toolbar">
             <button
@@ -1349,7 +1459,7 @@ export default function CustomizerPage() {
         </>
       )}
 
-      {activeProductRecord && (
+      {!isEmbedded && activeProductRecord && (
         <div className="clone-summary-card" ref={cloneSummaryRef}>
           <div className="clone-summary-media">
             {activeProductRecord?.cloneSource?.image ? (
@@ -1528,6 +1638,10 @@ export default function CustomizerPage() {
             onUploadActivate={handleUploadActivate}
           />
         </div>
+      )}
+
+      {isEmbedded && (!activeProduct || options.length === 0) && (
+        <div className="embedded-loading">Đang tải personalized...</div>
       )}
     </div>
   );

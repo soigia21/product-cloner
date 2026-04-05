@@ -11,7 +11,6 @@
   data-template-id="{{ metafield_template_id | escape }}"
   data-product-id="{{ product.id }}"
   data-product-handle="{{ product.handle | escape }}"
-  data-proxy-prefix="{{ block.settings.app_proxy_prefix | escape }}"
   data-app-base-url="{{ block.settings.app_base_url | escape }}"
   data-show-debug="{{ block.settings.show_debug }}"
 >
@@ -52,6 +51,20 @@
     border-radius: 8px;
     padding: 10px;
   }
+  .pz-embed-shell {
+    margin-top: 10px;
+    border: 1px solid rgba(16, 24, 40, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0b1020;
+  }
+  .pz-embed-frame {
+    width: 100%;
+    min-height: 640px;
+    border: 0;
+    display: block;
+    background: #0b1020;
+  }
 </style>
 
 <script src="{{ 'personalizer-block.js' | asset_url }}" defer></script>
@@ -64,17 +77,10 @@
   "settings": [
     {
       "type": "text",
-      "id": "app_proxy_prefix",
-      "label": "App proxy prefix",
-      "default": "/apps/personalizer",
-      "info": "Set empty if not using app proxy."
-    },
-    {
-      "type": "text",
       "id": "app_base_url",
       "label": "Fallback app URL",
       "default": "https://product-cloner.groupaliens.com",
-      "info": "Used when App proxy prefix is empty."
+      "info": "Domain chạy Product Cloner app, ví dụ: https://product-cloner.groupaliens.com"
     },
     {
       "type": "checkbox",
