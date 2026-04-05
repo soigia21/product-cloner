@@ -91,6 +91,9 @@ function parseProductJson(raw) {
       weightUnit: v.weight_unit || "kg",
       requiresShipping: v.requires_shipping ?? true,
       taxable: v.taxable ?? true,
+      inventoryManagement: v.inventory_management || null,
+      inventoryPolicy: v.inventory_policy || null,
+      inventoryQuantity: v.inventory_quantity ?? null,
     })),
     images: (raw.images || []).map((img, idx) => ({
       src: img.src || "",

@@ -22,6 +22,15 @@ const DEFAULT_UPLOAD_TRANSFORM = Object.freeze({
   rotation: 0,
 });
 
+function stripHtml(raw) {
+  return String(raw || "")
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function normalizeUploadTransform(raw) {
   const offsetX = Number(raw?.offsetX);
   const offsetY = Number(raw?.offsetY);
@@ -81,6 +90,8 @@ export default function CustomizerPage() {
   const [deletingProductId, setDeletingProductId] = useState(null);
   const [products, setProducts] = useState([]);
   const [activeProduct, setActiveProduct] = useState(null);
+  const [activeProductMeta, setActiveProductMeta] = useState(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [storeInfo, setStoreInfo] = useState(null);
 
   // Customizer state
@@ -136,6 +147,17 @@ export default function CustomizerPage() {
     () => products.find((p) => String(p.id) === String(activeProduct || "")) || null,
     [products, activeProduct]
   );
+  const activeClonedProduct = activeProductMeta?.clonedProduct || null;
+  const activeClonedImages = Array.isArray(activeClonedProduct?.images) ? activeClonedProduct.images : [];
+  const activeClonedVariants = Array.isArray(activeClonedProduct?.variants) ? activeClonedProduct.variants : [];
+  const activeClonedOptions = Array.isArray(activeClonedProduct?.options) ? activeClonedProduct.options : [];
+  const safeActiveImageIndex = Math.min(
+    Math.max(Number(activeImageIndex) || 0, 0),
+    Math.max(activeClonedImages.length - 1, 0)
+  );
+  const activeMainImage = activeClonedImages[safeActiveImageIndex] || activeClonedImages[0] || null;
+  const activeFirstVariant = activeClonedVariants[0] || null;
+  const activeDescriptionText = stripHtml(activeClonedProduct?.bodyHtml || "");
 
   const uploadHolderByOptionId = useMemo(() => {
     const map = {};
@@ -663,11 +685,17 @@ export default function CustomizerPage() {
   const selectProduct = async (productId) => {
     setError(null);
     try {
-      const res = await fetch(`/api/products/${productId}/options`);
-      const data = await res.json();
+      const [resOptions, resMeta] = await Promise.all([
+        fetch(`/api/products/${productId}/options`),
+        fetch(`/api/products/${productId}/meta`).catch(() => null),
+      ]);
+      const data = await resOptions.json();
+      const meta = resMeta ? await resMeta.json() : null;
 
       if (data.success) {
         setActiveProduct(productId);
+        setActiveProductMeta(meta?.success ? meta.product : null);
+        setActiveImageIndex(0);
         setOptions(data.options);
         setVisibleOptionIds(data.visibleOptionIds);
         setSelections(data.defaultSelections || {});
@@ -771,6 +799,8 @@ export default function CustomizerPage() {
 
   const clearActiveProductState = useCallback(() => {
     setActiveProduct(null);
+    setActiveProductMeta(null);
+    setActiveImageIndex(0);
     setOptions([]);
     setVisibleOptionIds([]);
     setSelections({});
@@ -1514,6 +1544,113 @@ export default function CustomizerPage() {
                 </a>
               ) : null}
             </div>
+          </div>
+        </div>
+      )}
+
+      {!isEmbedded && activeClonedProduct && (
+        <div className="product-detail-card">
+          <div className="product-detail-gallery">
+            <div className="product-detail-main-image">
+              {activeMainImage?.src ? (
+                <img
+                  src={activeMainImage.src}
+                  alt={activeMainImage.alt || activeClonedProduct.title || "Product image"}
+                />
+              ) : (
+                <div className="product-detail-no-image">No image</div>
+              )}
+            </div>
+
+            {activeClonedImages.length > 1 ? (
+              <div className="product-detail-thumbs">
+                {activeClonedImages.map((img, idx) => (
+                  <button
+                    key={`${img.src || "image"}-${idx}`}
+                    type="button"
+                    className={`product-detail-thumb ${idx === safeActiveImageIndex ? "active" : ""}`}
+                    onClick={() => setActiveImageIndex(idx)}
+                    title={img.alt || `Image ${idx + 1}`}
+                  >
+                    {img?.src ? <img src={img.src} alt={img.alt || `Image ${idx + 1}`} /> : <span>{idx + 1}</span>}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="product-detail-content">
+            <div className="product-detail-title-row">
+              <h3>{activeClonedProduct.title || activeProduct}</h3>
+              {activeClonedProduct?.sourceUrl ? (
+                <a
+                  className="btn btn-ghost btn-sm"
+                  href={activeClonedProduct.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Mở trang gốc
+                </a>
+              ) : null}
+            </div>
+
+            <div className="product-detail-price">
+              <span className="price">{activeFirstVariant?.price || "-"}</span>
+              {activeFirstVariant?.compareAtPrice ? (
+                <span className="price-compare">{activeFirstVariant.compareAtPrice}</span>
+              ) : null}
+            </div>
+
+            <div className="product-detail-meta">
+              <span>Vendor: {activeClonedProduct.vendor || "-"}</span>
+              <span>Type: {activeClonedProduct.productType || "-"}</span>
+              <span>Variants: {activeClonedVariants.length}</span>
+              <span>Images: {activeClonedImages.length}</span>
+            </div>
+
+            {Array.isArray(activeClonedProduct.tags) && activeClonedProduct.tags.length > 0 ? (
+              <div className="product-detail-tags">
+                {activeClonedProduct.tags.map((tag) => (
+                  <span key={tag} className="tag">{tag}</span>
+                ))}
+              </div>
+            ) : null}
+
+            {activeClonedOptions.length > 0 ? (
+              <div className="product-detail-section">
+                <h4>Options</h4>
+                <div className="product-detail-options">
+                  {activeClonedOptions.map((opt, idx) => (
+                    <div key={`${opt?.name || "option"}-${idx}`} className="product-detail-option-row">
+                      <strong>{opt?.name || `Option ${idx + 1}`}:</strong>
+                      <span>{Array.isArray(opt?.values) ? opt.values.join(", ") : "-"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeClonedVariants.length > 0 ? (
+              <div className="product-detail-section">
+                <h4>Variants</h4>
+                <div className="product-detail-variants">
+                  {activeClonedVariants.map((variant, idx) => (
+                    <div key={`${variant?.title || "variant"}-${idx}`} className="product-detail-variant-row">
+                      <span>{variant?.title || `Variant ${idx + 1}`}</span>
+                      <span>{variant?.price || "-"}</span>
+                      <span>{variant?.sku || "-"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeDescriptionText ? (
+              <div className="product-detail-section">
+                <h4>Description</h4>
+                <p className="product-detail-description">{activeDescriptionText}</p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

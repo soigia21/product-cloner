@@ -2,6 +2,7 @@ const API_VERSION = "2025-01";
 const TEMPLATE_METAFIELD_NAMESPACE = "personalizer";
 const TEMPLATE_METAFIELD_KEY = "template_id";
 const TEMPLATE_METAFIELD_TYPE = "single_line_text_field";
+const DEFAULT_IMPORTED_INVENTORY_QUANTITY = 999;
 
 function normalizeNumericProductId(productId) {
   const raw = String(productId || "").trim();
@@ -32,12 +33,93 @@ function getShopifyErrorMessage(data, fallbackStatus) {
   return errorMsg;
 }
 
+function normalizeInventoryQuantity(raw, fallback = DEFAULT_IMPORTED_INVENTORY_QUANTITY) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return Math.max(0, Math.floor(Number(fallback) || 0));
+  return Math.max(0, Math.floor(n));
+}
+
+async function getPrimaryLocationId(store, accessToken) {
+  const url = `https://${store}/admin/api/${API_VERSION}/locations.json?limit=1`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": accessToken,
+    },
+  });
+  const data = await parseShopifyResponse(response);
+  if (!response.ok) {
+    const errorMsg = getShopifyErrorMessage(data, response.status);
+    throw new Error(`Cannot fetch Shopify locations: ${errorMsg}`);
+  }
+  const first = Array.isArray(data?.locations) ? data.locations[0] : null;
+  const locationId = Number(first?.id);
+  if (!Number.isFinite(locationId) || locationId <= 0) {
+    throw new Error("No Shopify location found");
+  }
+  return locationId;
+}
+
+async function setInventoryLevel(store, accessToken, locationId, inventoryItemId, available) {
+  const url = `https://${store}/admin/api/${API_VERSION}/inventory_levels/set.json`;
+  const payload = {
+    location_id: Number(locationId),
+    inventory_item_id: Number(inventoryItemId),
+    available: Number(available),
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": accessToken,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseShopifyResponse(response);
+  if (!response.ok) {
+    const errorMsg = getShopifyErrorMessage(data, response.status);
+    throw new Error(`Cannot set inventory level: ${errorMsg}`);
+  }
+  return data?.inventory_level || null;
+}
+
+async function applyDefaultInventoryLevels(store, accessToken, productPayload = {}, defaultQuantity) {
+  const variants = Array.isArray(productPayload?.variants) ? productPayload.variants : [];
+  const inventoryItemIds = variants
+    .map((v) => Number(v?.inventory_item_id))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (inventoryItemIds.length === 0) {
+    return { updatedCount: 0, warnings: ["No inventory_item_id found on created variants"] };
+  }
+
+  const locationId = await getPrimaryLocationId(store, accessToken);
+  const warnings = [];
+  let updatedCount = 0;
+
+  for (const itemId of inventoryItemIds) {
+    try {
+      await setInventoryLevel(store, accessToken, locationId, itemId, defaultQuantity);
+      updatedCount += 1;
+    } catch (err) {
+      warnings.push(`inventory_item_id ${itemId}: ${err.message}`);
+    }
+  }
+
+  return { locationId, updatedCount, warnings };
+}
+
 /**
  * Tạo sản phẩm trên Shopify store qua Admin REST API
  * Dùng REST API thay vì GraphQL cho đơn giản (Custom App)
  */
 export async function createProduct(store, accessToken, product, options = {}) {
   const status = options?.status === "active" ? "active" : "draft";
+  const defaultInventoryQuantity = normalizeInventoryQuantity(
+    options?.defaultInventoryQuantity,
+    DEFAULT_IMPORTED_INVENTORY_QUANTITY
+  );
   const url = `https://${store}/admin/api/${API_VERSION}/products.json`;
 
   // Build product payload cho REST API
@@ -66,7 +148,9 @@ export async function createProduct(store, accessToken, product, options = {}) {
         weight_unit: v.weightUnit || "kg",
         requires_shipping: v.requiresShipping ?? true,
         taxable: v.taxable ?? true,
-        inventory_management: null,
+        inventory_management: v.inventoryManagement || "shopify",
+        inventory_policy: v.inventoryPolicy || "continue",
+        inventory_quantity: normalizeInventoryQuantity(v.inventoryQuantity, defaultInventoryQuantity),
       })),
       // Images - Shopify sẽ tự download từ URLs
       images: product.images.map((img) => ({
@@ -94,6 +178,22 @@ export async function createProduct(store, accessToken, product, options = {}) {
   }
 
   const created = data.product;
+  let inventoryWarnings = [];
+  let inventoryUpdatedCount = 0;
+  let inventoryLocationId = null;
+  try {
+    const applied = await applyDefaultInventoryLevels(
+      store,
+      accessToken,
+      created,
+      defaultInventoryQuantity
+    );
+    inventoryWarnings = applied.warnings || [];
+    inventoryUpdatedCount = Number(applied.updatedCount) || 0;
+    inventoryLocationId = applied.locationId || null;
+  } catch (error) {
+    inventoryWarnings = [error.message];
+  }
 
   return {
     success: true,
@@ -104,6 +204,10 @@ export async function createProduct(store, accessToken, product, options = {}) {
     status: created.status || status,
     variantsCount: created.variants?.length || 0,
     imagesCount: created.images?.length || 0,
+    defaultInventoryQuantity,
+    inventoryUpdatedCount,
+    inventoryLocationId,
+    inventoryWarnings,
   };
 }
 

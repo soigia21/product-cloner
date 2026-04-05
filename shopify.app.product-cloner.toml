@@ -1,0 +1,23 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "5baa8bc4a3e1f724d0915d1bff09a0e9"
+name = "Product Cloner"
+application_url = "https://product-cloner.groupaliens.com"
+embedded = false
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,write_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ "https://product-cloner.groupaliens.com/auth/callback" ]
+
+[app_proxy]
+url = "https://product-cloner.groupaliens.com/apps/personalizer"
+subpath = "personalizer"
+prefix = "apps"

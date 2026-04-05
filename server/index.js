@@ -28,6 +28,9 @@ preRegisterAllFonts();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const UPLOADS_DIR = path.resolve(process.cwd(), "data", "uploads");
+const DEFAULT_IMPORTED_INVENTORY_QUANTITY = Number.isFinite(Number(process.env.DEFAULT_IMPORTED_INVENTORY_QUANTITY))
+  ? Math.max(0, Math.floor(Number(process.env.DEFAULT_IMPORTED_INVENTORY_QUANTITY)))
+  : 999;
 
 function buildCloneMetadataFromResult(result = {}) {
   return {
@@ -50,6 +53,46 @@ function buildCloneSourceFromScraped(scrapedProduct = {}, sourceUrl = "") {
     variantsCount: Array.isArray(scrapedProduct?.variants) ? scrapedProduct.variants.length : 0,
     image: firstImage?.src || "",
     sourceUrl: sourceUrl || "",
+  };
+}
+
+function buildClonedProductSnapshot(scrapedProduct = {}, sourceUrl = "") {
+  return {
+    title: scrapedProduct?.title || "",
+    bodyHtml: scrapedProduct?.bodyHtml || "",
+    vendor: scrapedProduct?.vendor || "",
+    productType: scrapedProduct?.productType || "",
+    tags: Array.isArray(scrapedProduct?.tags) ? scrapedProduct.tags : [],
+    options: Array.isArray(scrapedProduct?.options)
+      ? scrapedProduct.options.map((opt) => ({
+        name: opt?.name || "",
+        values: Array.isArray(opt?.values) ? opt.values : [],
+      }))
+      : [],
+    variants: Array.isArray(scrapedProduct?.variants)
+      ? scrapedProduct.variants.map((v) => ({
+        title: v?.title || "",
+        price: v?.price || "",
+        compareAtPrice: v?.compareAtPrice || null,
+        sku: v?.sku || "",
+        option1: v?.option1 || null,
+        option2: v?.option2 || null,
+        option3: v?.option3 || null,
+        weight: v?.weight || 0,
+        weightUnit: v?.weightUnit || "kg",
+        requiresShipping: v?.requiresShipping ?? true,
+        taxable: v?.taxable ?? true,
+      }))
+      : [],
+    images: Array.isArray(scrapedProduct?.images)
+      ? scrapedProduct.images.map((img, idx) => ({
+        src: img?.src || "",
+        alt: img?.alt || "",
+        position: img?.position || idx + 1,
+      }))
+      : [],
+    sourceUrl,
+    importedAt: new Date().toISOString(),
   };
 }
 
@@ -202,7 +245,9 @@ app.post("/api/clone", async (req, res) => {
   }
   try {
     const tokenInfo = await getToken();
-    const result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, product);
+    const result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, product, {
+      defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+    });
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -343,10 +388,17 @@ app.post("/api/import", async (req, res) => {
     ]);
 
     const tokenInfo = await getToken();
-    const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, { status: "draft" });
+    const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, {
+      status: "draft",
+      defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+    });
     const shopifyClone = buildCloneMetadataFromResult(draftResult);
     const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
+    const clonedProduct = buildClonedProductSnapshot(scrapedProduct, url);
     const warnings = [];
+    for (const w of draftResult.inventoryWarnings || []) {
+      warnings.push(`Inventory warning: ${w}`);
+    }
     let templateMetafield = null;
     try {
       templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, draftResult.productId);
@@ -357,6 +409,7 @@ app.post("/api/import", async (req, res) => {
     updateProductMetadata(importedProduct.id, {
       shopifyClone,
       cloneSource,
+      clonedProduct,
       personalizer: templateMetafield
         ? {
           metafield: templateMetafield,
@@ -404,15 +457,22 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
       result = await updateProductStatus(cfg.storeDomain, tokenInfo.accessToken, existingProductId, "draft");
     } else {
       scraped = await scrapeProduct(product.url);
-      result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scraped, { status: "draft" });
+      result = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scraped, {
+        status: "draft",
+        defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+      });
     }
 
     const cloneSource = product.cloneSource || (scraped ? buildCloneSourceFromScraped(scraped, product.url) : null);
+    const clonedProduct = product.clonedProduct || (scraped ? buildClonedProductSnapshot(scraped, product.url) : null);
     const shopifyClone = {
       ...(product.shopifyClone || {}),
       ...buildCloneMetadataFromResult(result),
     };
     const warnings = [];
+    for (const w of result.inventoryWarnings || []) {
+      warnings.push(`Inventory warning: ${w}`);
+    }
     let templateMetafield = null;
     try {
       templateMetafield = await syncTemplateMetafieldToShopify(product.id, shopifyClone.productId);
@@ -423,6 +483,7 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
     const patch = {
       shopifyClone,
       ...(cloneSource ? { cloneSource } : {}),
+      ...(clonedProduct ? { clonedProduct } : {}),
     };
     if (templateMetafield) {
       patch.personalizer = {
@@ -507,6 +568,28 @@ app.post("/api/products/:id/sync-template-metafield", async (req, res) => {
  */
 app.get("/api/products", (req, res) => {
   res.json({ success: true, products: listProducts() });
+});
+
+/**
+ * GET /api/products/:id/meta — Full cloned product + Shopify metadata
+ */
+app.get("/api/products/:id/meta", (req, res) => {
+  const product = loadProduct(req.params.id);
+  if (!product) return res.status(404).json({ success: false, error: "Product not found" });
+
+  res.json({
+    success: true,
+    product: {
+      id: product.id,
+      url: product.url,
+      handle: product.handle,
+      importedAt: product.importedAt,
+      cloneSource: product.cloneSource || null,
+      clonedProduct: product.clonedProduct || null,
+      shopifyClone: product.shopifyClone || null,
+      personalizer: product.personalizer || null,
+    },
+  });
 });
 
 /**
