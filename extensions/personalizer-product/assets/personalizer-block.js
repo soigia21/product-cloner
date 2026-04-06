@@ -6,7 +6,13 @@
   const MIN_HEIGHT = 640;
   const MAX_HEIGHT = 2200;
   const DEFAULT_HEIGHT = 1180;
+  const PREVIEW_RETRY_DELAY_MS = 240;
+  const PREVIEW_RETRY_MAX_ATTEMPTS = 28;
+  const MEDIA_MUTATION_DEBOUNCE_MS = 120;
+  const MOUNT_OBSERVER_DEBOUNCE_MS = 60;
   const iframeByWindow = new Map();
+  let mountObserver = null;
+  let mountDebounceTimer = null;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -35,51 +41,14 @@
     return Boolean(node);
   }
 
-  function findFeaturedImage(root) {
-    const selectors = [
-      ".product__media-item.is-active img",
-      ".product__media-item[aria-hidden='false'] img",
-      "media-gallery .product__media img",
-      "[data-product-media-container] img",
-      "[data-product-media] img",
-      ".featured-media img",
-      ".product-single__media img",
-      ".product-gallery img",
-      "main img",
-    ];
-    const rootSection = root?.closest(".shopify-section, section");
-    const candidates = [];
-    for (const selector of selectors) {
-      const list = document.querySelectorAll(selector);
-      for (const img of list) {
-        if (!(img instanceof HTMLImageElement)) continue;
-        if (!isVisible(img)) continue;
-        const width = Number(img.clientWidth || 0);
-        const height = Number(img.clientHeight || 0);
-        if (width < 80 || height < 80) continue;
-        const inSameSection = rootSection && img.closest(".shopify-section, section") === rootSection;
-        const score =
-          (matchesActiveMedia(img) ? 30 : 0) +
-          (inSameSection ? 20 : 0) +
-          (selector.includes("is-active") ? 10 : 0) +
-          Math.min(width, 1200) / 100;
-        candidates.push({ img, score });
-      }
-      if (candidates.length > 0) break;
-    }
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].img;
+  function getRootSection(root) {
+    return root?.closest(".shopify-section, section") || null;
   }
 
-  function applyPreviewAsMainImage(root, previewUrl) {
-    const img = findFeaturedImage(root);
-    if (!img) return false;
-
-    if (!img.dataset.pzOriginalSrc) {
-      img.dataset.pzOriginalSrc = img.currentSrc || img.src || "";
-    }
+  function setImageSource(img, previewUrl) {
+    if (!(img instanceof HTMLImageElement)) return;
     img.src = previewUrl;
+    img.setAttribute("data-src", previewUrl);
     img.removeAttribute("srcset");
     img.removeAttribute("sizes");
     img.setAttribute("data-pz-preview-applied", "1");
@@ -89,19 +58,160 @@
       const sources = pic.querySelectorAll("source");
       for (const source of sources) {
         source.setAttribute("srcset", previewUrl);
+        source.setAttribute("data-srcset", previewUrl);
       }
+    }
+  }
+
+  function collectFeaturedImages(root) {
+    const selectors = [
+      "media-gallery .product__media-item.is-active img",
+      ".product__media-item.is-active img",
+      ".product__media-item[aria-hidden='false'] img",
+      "media-gallery .product__media img",
+      "[data-product-media-container] img",
+      "[data-product-media] img",
+      "[data-media-id] img",
+      ".product__media img",
+      ".featured-media img",
+      ".product-gallery__image img",
+      ".product-single__media img",
+      ".product-gallery img",
+      "main img",
+    ];
+    const rootSection = getRootSection(root);
+    const seen = new Map();
+
+    for (const selector of selectors) {
+      const list = document.querySelectorAll(selector);
+      for (const img of list) {
+        if (!(img instanceof HTMLImageElement)) continue;
+        if (!isVisible(img)) continue;
+        const width = Number(img.clientWidth || img.naturalWidth || 0);
+        const height = Number(img.clientHeight || img.naturalHeight || 0);
+        if (width < 120 || height < 120) continue;
+        const inSameSection = rootSection && img.closest(".shopify-section, section") === rootSection;
+        const inMediaContainer = Boolean(
+          img.closest(
+            "media-gallery, .product__media, [data-product-media], [data-media-id], .product-gallery, .product-single__media, .featured-media"
+          )
+        );
+        const isThumb = Boolean(
+          img.closest(
+            ".thumbnail, .product__media-thumbnail, [data-thumbnail], .product-gallery__thumbnail, .product-thumbnails"
+          )
+        );
+        const areaScore = Math.min((width * height) / 14000, 160);
+        const score =
+          areaScore +
+          (matchesActiveMedia(img) ? 30 : 0) +
+          (inMediaContainer ? 18 : 0) +
+          (inSameSection ? 20 : 0) +
+          (selector.includes("is-active") ? 8 : 0) -
+          (isThumb ? 26 : 0);
+        const prev = seen.get(img);
+        if (!prev || score > prev.score) {
+          seen.set(img, { img, score });
+        }
+      }
+    }
+
+    const candidates = [...seen.values()];
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    const topScore = candidates[0].score;
+    return candidates
+      .filter((entry) => entry.score >= topScore - 14)
+      .slice(0, 6)
+      .map((entry) => entry.img);
+  }
+
+  function applyPreviewAsMainImage(root, previewUrl) {
+    const targets = collectFeaturedImages(root);
+    if (!targets || targets.length === 0) return false;
+
+    let appliedCount = 0;
+    for (const img of targets) {
+      if (!img.dataset.pzOriginalSrc) {
+        img.dataset.pzOriginalSrc = img.currentSrc || img.src || "";
+      }
+      setImageSource(img, previewUrl);
+      appliedCount += 1;
     }
 
     window.dispatchEvent(
       new CustomEvent("product-cloner:main-image-updated", {
         detail: {
           previewUrl,
-          element: img,
+          count: appliedCount,
+          element: targets[0] || null,
         },
       })
     );
 
-    return true;
+    return appliedCount > 0;
+  }
+
+  function clearPreviewRetry(linked) {
+    if (!linked) return;
+    if (linked.retryTimer) {
+      clearTimeout(linked.retryTimer);
+      linked.retryTimer = null;
+    }
+    if (linked.observerDebounceTimer) {
+      clearTimeout(linked.observerDebounceTimer);
+      linked.observerDebounceTimer = null;
+    }
+    linked.retryAttempts = 0;
+  }
+
+  function tryApplyPendingPreview(linked) {
+    if (!linked || !linked.pendingPreviewUrl) return false;
+    if (linked.pendingPreviewUrl === linked.lastAppliedPreviewUrl) return true;
+
+    const ok = applyPreviewAsMainImage(linked.root, linked.pendingPreviewUrl);
+    if (ok) {
+      linked.lastPreviewUrl = linked.pendingPreviewUrl;
+      linked.lastAppliedPreviewUrl = linked.pendingPreviewUrl;
+      clearPreviewRetry(linked);
+      return true;
+    }
+
+    linked.retryAttempts = Number(linked.retryAttempts || 0) + 1;
+    if (linked.retryAttempts > PREVIEW_RETRY_MAX_ATTEMPTS) {
+      clearPreviewRetry(linked);
+      return false;
+    }
+
+    if (linked.retryTimer) clearTimeout(linked.retryTimer);
+    linked.retryTimer = setTimeout(() => {
+      linked.retryTimer = null;
+      tryApplyPendingPreview(linked);
+    }, PREVIEW_RETRY_DELAY_MS);
+    return false;
+  }
+
+  function bindMediaObserver(linked) {
+    if (!linked || linked.observer || typeof MutationObserver === "undefined") return;
+    const observeRoot = getRootSection(linked.root) || document.body;
+    if (!observeRoot) return;
+
+    const observer = new MutationObserver(() => {
+      if (!linked.pendingPreviewUrl) return;
+      if (linked.observerDebounceTimer) clearTimeout(linked.observerDebounceTimer);
+      linked.observerDebounceTimer = setTimeout(() => {
+        linked.observerDebounceTimer = null;
+        tryApplyPendingPreview(linked);
+      }, MEDIA_MUTATION_DEBOUNCE_MS);
+    });
+
+    observer.observe(observeRoot, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style", "src", "srcset", "aria-hidden", "data-media-active"],
+    });
+    linked.observer = observer;
   }
 
   function getStatusNode(root) {
@@ -157,51 +267,68 @@
 
   function bindIframeResize(iframe, expectedOrigin, root) {
     if (!iframe?.contentWindow) return;
-    iframeByWindow.set(iframe.contentWindow, {
+    const existing = iframeByWindow.get(iframe.contentWindow) || {};
+    const linked = {
       iframe,
       expectedOrigin,
       root,
-      lastPreviewUrl: "",
-    });
+      lastPreviewUrl: existing.lastPreviewUrl || "",
+      lastAppliedPreviewUrl: existing.lastAppliedPreviewUrl || "",
+      pendingPreviewUrl: existing.pendingPreviewUrl || "",
+      retryTimer: existing.retryTimer || null,
+      retryAttempts: existing.retryAttempts || 0,
+      observer: existing.observer || null,
+      observerDebounceTimer: existing.observerDebounceTimer || null,
+    };
+    iframeByWindow.set(iframe.contentWindow, linked);
+    bindMediaObserver(linked);
+    if (linked.pendingPreviewUrl) {
+      tryApplyPendingPreview(linked);
+    }
   }
 
   function mountRoot(root) {
     if (!root || root.dataset.pzMounted === "1") return;
     root.dataset.pzMounted = "1";
 
-    const embedUrl = buildEmbedUrl(root);
-    if (!embedUrl) {
-      setStatus(root, "Missing app_base_url for embedded personalizer.", "pz-status--error");
-      return;
-    }
+    try {
+      const embedUrl = buildEmbedUrl(root);
+      if (!embedUrl) {
+        setStatus(root, "Missing app_base_url for embedded personalizer.", "pz-status--error");
+        return;
+      }
 
-    setStatus(root, "Loading personalized customizer...", "pz-status--loading");
+      setStatus(root, "Loading personalized customizer...", "pz-status--loading");
 
-    const shell = document.createElement("div");
-    shell.className = "pz-embed-shell";
+      const shell = document.createElement("div");
+      shell.className = "pz-embed-shell";
 
-    const iframe = document.createElement("iframe");
-    iframe.className = "pz-embed-frame";
-    iframe.loading = "lazy";
-    iframe.referrerPolicy = "strict-origin-when-cross-origin";
-    iframe.allow = "clipboard-read; clipboard-write";
-    iframe.src = embedUrl.toString();
-    iframe.style.height = `${DEFAULT_HEIGHT}px`;
-    shell.appendChild(iframe);
-    root.appendChild(shell);
+      const iframe = document.createElement("iframe");
+      iframe.className = "pz-embed-frame";
+      iframe.loading = "lazy";
+      iframe.referrerPolicy = "strict-origin-when-cross-origin";
+      iframe.allow = "clipboard-read; clipboard-write";
+      iframe.src = embedUrl.toString();
+      iframe.style.height = `${DEFAULT_HEIGHT}px`;
+      shell.appendChild(iframe);
+      root.appendChild(shell);
 
-    bindIframeResize(iframe, embedUrl.origin, root);
-
-    iframe.addEventListener("load", () => {
       bindIframeResize(iframe, embedUrl.origin, root);
-      setStatus(root, "Personalized UI loaded.", "pz-status--ok");
-      setDebug(root, {
-        src: iframe.src,
-        templateId: root.dataset.templateId || "",
-        productId: root.dataset.productId || "",
-        handle: root.dataset.productHandle || "",
+
+      iframe.addEventListener("load", () => {
+        bindIframeResize(iframe, embedUrl.origin, root);
+        setStatus(root, "Personalized UI loaded.", "pz-status--ok");
+        setDebug(root, {
+          src: iframe.src,
+          templateId: root.dataset.templateId || "",
+          productId: root.dataset.productId || "",
+          handle: root.dataset.productHandle || "",
+        });
       });
-    });
+    } catch (error) {
+      root.dataset.pzMounted = "0";
+      setStatus(root, `Failed to initialize personalizer: ${error?.message || "Unknown error"}`, "pz-status--error");
+    }
   }
 
   function mountAll() {
@@ -209,6 +336,34 @@
     for (const root of roots) {
       mountRoot(root);
     }
+  }
+
+  function scheduleMountAll() {
+    if (mountDebounceTimer) clearTimeout(mountDebounceTimer);
+    mountDebounceTimer = setTimeout(() => {
+      mountDebounceTimer = null;
+      mountAll();
+    }, MOUNT_OBSERVER_DEBOUNCE_MS);
+  }
+
+  function ensureMountObserver() {
+    if (mountObserver || typeof MutationObserver === "undefined") return;
+    mountObserver = new MutationObserver((mutations) => {
+      let shouldMount = false;
+      for (const mutation of mutations || []) {
+        if (mutation.type !== "childList") continue;
+        if ((mutation.addedNodes && mutation.addedNodes.length > 0) || (mutation.removedNodes && mutation.removedNodes.length > 0)) {
+          shouldMount = true;
+          break;
+        }
+      }
+      if (shouldMount) scheduleMountAll();
+    });
+
+    mountObserver.observe(document.documentElement || document.body, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   window.addEventListener("message", (event) => {
@@ -228,15 +383,23 @@
     if (payload.type === PREVIEW_EVENT) {
       const previewUrl = String(payload.previewUrl || "");
       if (!previewUrl.startsWith("data:image/")) return;
-      if (previewUrl === linked.lastPreviewUrl) return;
-      linked.lastPreviewUrl = previewUrl;
-      applyPreviewAsMainImage(linked.root, previewUrl);
+      linked.pendingPreviewUrl = previewUrl;
+      if (previewUrl === linked.lastAppliedPreviewUrl) return;
+      tryApplyPendingPreview(linked);
     }
   });
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountAll, { once: true });
+    document.addEventListener("DOMContentLoaded", () => {
+      mountAll();
+      ensureMountObserver();
+    }, { once: true });
   } else {
     mountAll();
+    ensureMountObserver();
   }
+
+  document.addEventListener("shopify:section:load", scheduleMountAll);
+  document.addEventListener("shopify:section:reorder", scheduleMountAll);
+  document.addEventListener("shopify:block:select", scheduleMountAll);
 })();

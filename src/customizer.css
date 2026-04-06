@@ -18,6 +18,11 @@
   gap: 14px;
 }
 
+.customizer-page.embedded-mode .customizer-layout.without-preview {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
 .embedded-loading {
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
@@ -442,6 +447,10 @@
   overflow: hidden;
   background: #1b2631;
   aspect-ratio: 1;
+}
+
+.preview-image-wrapper--hidden {
+  display: none !important;
 }
 
 .preview-image-wrapper img {

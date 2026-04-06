@@ -39,6 +39,7 @@ function buildCloneMetadataFromResult(result = {}) {
     productHandle: result.productHandle || "",
     productUrl: result.productUrl || "",
     status: result.status || "draft",
+    publication: result.publication || null,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -401,6 +402,9 @@ app.post("/api/import", async (req, res) => {
     for (const w of draftResult.inventoryWarnings || []) {
       warnings.push(`Inventory warning: ${w}`);
     }
+    for (const w of draftResult.publishWarnings || []) {
+      warnings.push(w);
+    }
     let templateMetafield = null;
     try {
       templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, draftResult.productId);
@@ -476,6 +480,9 @@ app.post("/api/products/:id/save-draft", async (req, res) => {
     for (const w of result.inventoryWarnings || []) {
       warnings.push(`Inventory warning: ${w}`);
     }
+    for (const w of result.publishWarnings || []) {
+      warnings.push(w);
+    }
     let templateMetafield = null;
     try {
       templateMetafield = await syncTemplateMetafieldToShopify(product.id, shopifyClone.productId);
@@ -528,7 +535,12 @@ app.post("/api/products/:id/publish", async (req, res) => {
       publishedAt: new Date().toISOString(),
     };
     updateProductMetadata(product.id, { shopifyClone });
-    res.json({ success: true, productId: product.id, shopifyClone });
+    res.json({
+      success: true,
+      productId: product.id,
+      shopifyClone,
+      warnings: result.warnings || [],
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

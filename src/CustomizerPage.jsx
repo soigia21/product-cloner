@@ -125,6 +125,7 @@ export default function CustomizerPage() {
   const lastParentPreviewTsRef = useRef(0);
 
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const resolveEmbeddedTemplateId = useCallback(async () => {
     if (!isEmbedded) return "";
@@ -696,6 +697,7 @@ export default function CustomizerPage() {
     }
     setImporting(true);
     setError(null);
+    setNotice(null);
 
     try {
       const res = await fetch("/api/import", {
@@ -706,6 +708,9 @@ export default function CustomizerPage() {
       const data = await res.json();
 
       if (data.success) {
+        if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+          setNotice(data.warnings.join(" | "));
+        }
         setImportUrl("");
         // Refresh products list
         await refreshProducts();
@@ -1305,6 +1310,7 @@ export default function CustomizerPage() {
   const hasFocusedUpload = Boolean(
     focusedUploadOptionId && uploadInputs?.[String(focusedUploadOptionId)]
   );
+  const hideEmbeddedPreview = isEmbedded;
   const focusedUploadLayer = findFocusedUploadLayer();
   const focusedUploadFrameStyle = (() => {
     if (!hasFocusedUpload || !focusedUploadLayer) return null;
@@ -1341,6 +1347,7 @@ export default function CustomizerPage() {
 
     setCleaningOld(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/products/cleanup-old", {
         method: "POST",
@@ -1374,6 +1381,7 @@ export default function CustomizerPage() {
 
     setDeletingProductId(pid);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/products/${encodeURIComponent(pid)}`, { method: "DELETE" });
       const data = await res.json();
@@ -1397,6 +1405,7 @@ export default function CustomizerPage() {
     if (!activeProduct || savingDraft || publishingProduct) return;
     setSavingDraft(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/products/${encodeURIComponent(activeProduct)}/save-draft`, {
         method: "POST",
@@ -1405,6 +1414,9 @@ export default function CustomizerPage() {
       if (!res.ok || !data?.success) {
         setError(data?.error || "Không thể lưu Draft");
         return;
+      }
+      if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        setNotice(data.warnings.join(" | "));
       }
       await refreshProducts();
     } catch {
@@ -1418,6 +1430,7 @@ export default function CustomizerPage() {
     if (!activeProduct || savingDraft || publishingProduct) return;
     setPublishingProduct(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch(`/api/products/${encodeURIComponent(activeProduct)}/publish`, {
         method: "POST",
@@ -1426,6 +1439,11 @@ export default function CustomizerPage() {
       if (!res.ok || !data?.success) {
         setError(data?.error || "Không thể publish product");
         return;
+      }
+      if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        setNotice(data.warnings.join(" | "));
+      } else {
+        setNotice("Publish thành công sang Online Store channel.");
       }
       await refreshProducts();
     } catch {
@@ -1485,6 +1503,15 @@ export default function CustomizerPage() {
           <span className="banner-icon">❌</span>
           <div className="banner-content">
             <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <div className="banner" style={{ marginBottom: 16, border: "1px solid #f5d6a1", background: "#fff8eb" }}>
+          <span className="banner-icon">ℹ️</span>
+          <div className="banner-content">
+            <p>{notice}</p>
           </div>
         </div>
       )}
@@ -1702,107 +1729,113 @@ export default function CustomizerPage() {
 
       {/* Customizer Layout */}
       {activeProduct && options.length > 0 && (
-        <div className="customizer-layout">
+        <div className={`customizer-layout ${hideEmbeddedPreview ? "without-preview" : ""}`}>
           {/* Left: Preview */}
-          <div
-            className={`preview-image-wrapper ${focusedUploadOptionId ? "upload-editing" : ""}`}
-            style={{ aspectRatio: previewAspectRatio }}
-          >
-            <canvas
-              ref={canvasRef}
-              className="preview-canvas"
-              onPointerDown={handleCanvasPointerDown}
-              onPointerMove={handleCanvasPointerMove}
-              onPointerUp={handleCanvasPointerEnd}
-              onPointerCancel={handleCanvasPointerEnd}
-              onPointerLeave={handleCanvasPointerEnd}
-            />
-            {previewLoading && (
-              <div className="preview-loading">
-                <span className="spinner"></span> Đang render...
-              </div>
-            )}
-            {hasFocusedUpload && focusedUploadFrameStyle && (
-              <div className="upload-edit-frame" style={focusedUploadFrameStyle}>
-                <button
-                  type="button"
-                  className="upload-edit-handle handle-tl"
-                  onPointerDown={handleResizeHandlePointerDown}
-                  onPointerMove={handleResizeHandlePointerMove}
-                  onPointerUp={handleResizeHandlePointerEnd}
-                  onPointerCancel={handleResizeHandlePointerEnd}
-                />
-                <button
-                  type="button"
-                  className="upload-edit-handle handle-tr"
-                  onPointerDown={handleResizeHandlePointerDown}
-                  onPointerMove={handleResizeHandlePointerMove}
-                  onPointerUp={handleResizeHandlePointerEnd}
-                  onPointerCancel={handleResizeHandlePointerEnd}
-                />
-                <button
-                  type="button"
-                  className="upload-edit-handle handle-bl"
-                  onPointerDown={handleResizeHandlePointerDown}
-                  onPointerMove={handleResizeHandlePointerMove}
-                  onPointerUp={handleResizeHandlePointerEnd}
-                  onPointerCancel={handleResizeHandlePointerEnd}
-                />
-                <button
-                  type="button"
-                  className="upload-edit-handle handle-br"
-                  onPointerDown={handleResizeHandlePointerDown}
-                  onPointerMove={handleResizeHandlePointerMove}
-                  onPointerUp={handleResizeHandlePointerEnd}
-                  onPointerCancel={handleResizeHandlePointerEnd}
-                />
-                <button
-                  type="button"
-                  className="upload-edit-rotate-btn"
-                  onPointerDown={handleRotateHandlePointerDown}
-                  onPointerMove={handleRotateHandlePointerMove}
-                  onPointerUp={handleRotateHandlePointerEnd}
-                  onPointerCancel={handleRotateHandlePointerEnd}
-                  title="Xoay ảnh"
-                  aria-label="Rotate image"
-                >
-                  ↻
-                </button>
-              </div>
-            )}
-            {hasFocusedUpload && (
-              <div className="preview-controls-overlay">
-                <div className="preview-controls-row">
+          {hideEmbeddedPreview ? (
+            <div className="preview-image-wrapper preview-image-wrapper--hidden" aria-hidden="true">
+              <canvas ref={canvasRef} className="preview-canvas" />
+            </div>
+          ) : (
+            <div
+              className={`preview-image-wrapper ${focusedUploadOptionId ? "upload-editing" : ""}`}
+              style={{ aspectRatio: previewAspectRatio }}
+            >
+              <canvas
+                ref={canvasRef}
+                className="preview-canvas"
+                onPointerDown={handleCanvasPointerDown}
+                onPointerMove={handleCanvasPointerMove}
+                onPointerUp={handleCanvasPointerEnd}
+                onPointerCancel={handleCanvasPointerEnd}
+                onPointerLeave={handleCanvasPointerEnd}
+              />
+              {previewLoading && (
+                <div className="preview-loading">
+                  <span className="spinner"></span> Đang render...
+                </div>
+              )}
+              {hasFocusedUpload && focusedUploadFrameStyle && (
+                <div className="upload-edit-frame" style={focusedUploadFrameStyle}>
                   <button
                     type="button"
-                    className="upload-editor-btn"
-                    aria-label="Zoom out"
-                    onClick={() => handleFocusedUploadAction("zoom", -0.08)}
-                  >
-                    <ZoomGlyph mode="minus" />
-                  </button>
+                    className="upload-edit-handle handle-tl"
+                    onPointerDown={handleResizeHandlePointerDown}
+                    onPointerMove={handleResizeHandlePointerMove}
+                    onPointerUp={handleResizeHandlePointerEnd}
+                    onPointerCancel={handleResizeHandlePointerEnd}
+                  />
                   <button
                     type="button"
-                    className="upload-editor-btn"
-                    aria-label="Zoom in"
-                    onClick={() => handleFocusedUploadAction("zoom", 0.08)}
+                    className="upload-edit-handle handle-tr"
+                    onPointerDown={handleResizeHandlePointerDown}
+                    onPointerMove={handleResizeHandlePointerMove}
+                    onPointerUp={handleResizeHandlePointerEnd}
+                    onPointerCancel={handleResizeHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    className="upload-edit-handle handle-bl"
+                    onPointerDown={handleResizeHandlePointerDown}
+                    onPointerMove={handleResizeHandlePointerMove}
+                    onPointerUp={handleResizeHandlePointerEnd}
+                    onPointerCancel={handleResizeHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    className="upload-edit-handle handle-br"
+                    onPointerDown={handleResizeHandlePointerDown}
+                    onPointerMove={handleResizeHandlePointerMove}
+                    onPointerUp={handleResizeHandlePointerEnd}
+                    onPointerCancel={handleResizeHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    className="upload-edit-rotate-btn"
+                    onPointerDown={handleRotateHandlePointerDown}
+                    onPointerMove={handleRotateHandlePointerMove}
+                    onPointerUp={handleRotateHandlePointerEnd}
+                    onPointerCancel={handleRotateHandlePointerEnd}
+                    title="Xoay ảnh"
+                    aria-label="Rotate image"
                   >
-                    <ZoomGlyph mode="plus" />
+                    ↻
                   </button>
-                  <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveY", -8)}><span className="arrow-glyph">↑</span></button>
-                  <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveY", 8)}><span className="arrow-glyph">↓</span></button>
-                  <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveX", -8)}><span className="arrow-glyph">←</span></button>
-                  <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveX", 8)}><span className="arrow-glyph">→</span></button>
-                  <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("rotate", -3)}><span className="arrow-glyph">↺</span></button>
-                  <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("rotate", 3)}><span className="arrow-glyph">↻</span></button>
-                  <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("reset", 0)}>Reset</button>
                 </div>
-                <div className="preview-controls-hint">
-                  X: {focusedUploadTransform.offsetX.toFixed(1)} | Y: {focusedUploadTransform.offsetY.toFixed(1)} | Zoom: {focusedUploadTransform.scale.toFixed(2)} | R: {focusedUploadTransform.rotation.toFixed(1)}°
+              )}
+              {hasFocusedUpload && (
+                <div className="preview-controls-overlay">
+                  <div className="preview-controls-row">
+                    <button
+                      type="button"
+                      className="upload-editor-btn"
+                      aria-label="Zoom out"
+                      onClick={() => handleFocusedUploadAction("zoom", -0.08)}
+                    >
+                      <ZoomGlyph mode="minus" />
+                    </button>
+                    <button
+                      type="button"
+                      className="upload-editor-btn"
+                      aria-label="Zoom in"
+                      onClick={() => handleFocusedUploadAction("zoom", 0.08)}
+                    >
+                      <ZoomGlyph mode="plus" />
+                    </button>
+                    <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveY", -8)}><span className="arrow-glyph">↑</span></button>
+                    <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveY", 8)}><span className="arrow-glyph">↓</span></button>
+                    <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveX", -8)}><span className="arrow-glyph">←</span></button>
+                    <button type="button" className="upload-editor-btn is-arrow" onClick={() => handleFocusedUploadAction("moveX", 8)}><span className="arrow-glyph">→</span></button>
+                    <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("rotate", -3)}><span className="arrow-glyph">↺</span></button>
+                    <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("rotate", 3)}><span className="arrow-glyph">↻</span></button>
+                    <button type="button" className="upload-editor-btn" onClick={() => handleFocusedUploadAction("reset", 0)}>Reset</button>
+                  </div>
+                  <div className="preview-controls-hint">
+                    X: {focusedUploadTransform.offsetX.toFixed(1)} | Y: {focusedUploadTransform.offsetY.toFixed(1)} | Zoom: {focusedUploadTransform.scale.toFixed(2)} | R: {focusedUploadTransform.rotation.toFixed(1)}°
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Right: Form */}
           <CustomizerForm

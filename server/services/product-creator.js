@@ -39,6 +39,108 @@ function normalizeInventoryQuantity(raw, fallback = DEFAULT_IMPORTED_INVENTORY_Q
   return Math.max(0, Math.floor(n));
 }
 
+async function shopifyGraphQL(store, accessToken, query, variables = {}) {
+  const url = `https://${store}/admin/api/${API_VERSION}/graphql.json`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": accessToken,
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const data = await parseShopifyResponse(response);
+  if (!response.ok) {
+    const errorMsg = getShopifyErrorMessage(data, response.status);
+    throw new Error(`Shopify GraphQL Error: ${errorMsg}`);
+  }
+
+  if (Array.isArray(data?.errors) && data.errors.length > 0) {
+    throw new Error(
+      data.errors
+        .map((err) => err?.message || JSON.stringify(err))
+        .filter(Boolean)
+        .join("; ")
+    );
+  }
+
+  return data?.data || {};
+}
+
+function toProductGid(productId) {
+  const numeric = normalizeNumericProductId(productId);
+  if (!numeric) return "";
+  return `gid://shopify/Product/${numeric}`;
+}
+
+async function findOnlineStorePublication(store, accessToken) {
+  const query = `
+    query ProductClonerPublications {
+      publications(first: 30) {
+        nodes {
+          id
+          name
+        }
+      }
+    }
+  `;
+  const data = await shopifyGraphQL(store, accessToken, query);
+  const nodes = Array.isArray(data?.publications?.nodes) ? data.publications.nodes : [];
+  if (nodes.length === 0) return null;
+
+  const online = nodes.find((node) => /online\s*store/i.test(String(node?.name || "")));
+  return online || nodes[0];
+}
+
+async function publishProductToOnlineStore(store, accessToken, productId) {
+  const productGid = toProductGid(productId);
+  if (!productGid) {
+    throw new Error("Invalid Shopify product id for publication");
+  }
+
+  const publication = await findOnlineStorePublication(store, accessToken);
+  if (!publication?.id) {
+    throw new Error("No publication channel found");
+  }
+
+  const mutation = `
+    mutation ProductClonerPublishProduct($id: ID!, $input: [PublicationInput!]!) {
+      publishablePublish(id: $id, input: $input) {
+        publishable {
+          ... on Product {
+            id
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+  const data = await shopifyGraphQL(store, accessToken, mutation, {
+    id: productGid,
+    input: [{ publicationId: publication.id }],
+  });
+
+  const userErrors = Array.isArray(data?.publishablePublish?.userErrors)
+    ? data.publishablePublish.userErrors
+    : [];
+  if (userErrors.length > 0) {
+    const msg = userErrors
+      .map((err) => err?.message || "")
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(msg || "Unknown publishablePublish error");
+  }
+
+  return {
+    publicationId: publication.id,
+    publicationName: publication.name || "",
+  };
+}
+
 async function getPrimaryLocationId(store, accessToken) {
   const url = `https://${store}/admin/api/${API_VERSION}/locations.json?limit=1`;
   const response = await fetch(url, {
@@ -197,6 +299,16 @@ export async function createProduct(store, accessToken, product, options = {}) {
     inventoryWarnings = [error.message];
   }
 
+  let publication = null;
+  let publishWarnings = [];
+  if (status === "active") {
+    try {
+      publication = await publishProductToOnlineStore(store, accessToken, created.id);
+    } catch (error) {
+      publishWarnings = [`Online Store publication warning: ${error.message}`];
+    }
+  }
+
   return {
     success: true,
     productId: created.id,
@@ -210,13 +322,15 @@ export async function createProduct(store, accessToken, product, options = {}) {
     inventoryUpdatedCount,
     inventoryLocationId,
     inventoryWarnings,
+    publication,
+    publishWarnings,
   };
 }
 
 /**
  * Update Shopify product status (draft | active)
  */
-export async function updateProductStatus(store, accessToken, productId, status) {
+export async function updateProductStatus(store, accessToken, productId, status, options = {}) {
   const nextStatus = status === "active" ? "active" : "draft";
   const numericId = normalizeNumericProductId(productId);
   if (!numericId) {
@@ -248,6 +362,16 @@ export async function updateProductStatus(store, accessToken, productId, status)
   }
 
   const updated = data.product || {};
+  let publication = null;
+  const warnings = [];
+  if (nextStatus === "active" && options?.publishToOnlineStore !== false) {
+    try {
+      publication = await publishProductToOnlineStore(store, accessToken, numericId);
+    } catch (error) {
+      warnings.push(`Online Store publication warning: ${error.message}`);
+    }
+  }
+
   return {
     success: true,
     productId: updated.id || Number(numericId),
@@ -255,6 +379,8 @@ export async function updateProductStatus(store, accessToken, productId, status)
     productHandle: updated.handle || "",
     productUrl: `https://${store}/admin/products/${updated.id || numericId}`,
     status: updated.status || nextStatus,
+    publication,
+    warnings,
   };
 }
 
