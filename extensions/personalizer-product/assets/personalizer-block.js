@@ -3,9 +3,10 @@
 
   const EMBED_EVENT = "product-cloner:embedded-resize";
   const PREVIEW_EVENT = "product-cloner:preview-updated";
-  const MIN_HEIGHT = 640;
+  const INTERACTION_EVENT = "product-cloner:user-interacted";
+  const MIN_HEIGHT = 220;
   const MAX_HEIGHT = 2200;
-  const DEFAULT_HEIGHT = 1180;
+  const DEFAULT_HEIGHT = 760;
   const PREVIEW_RETRY_DELAY_MS = 240;
   const PREVIEW_RETRY_MAX_ATTEMPTS = 28;
   const MEDIA_MUTATION_DEBOUNCE_MS = 120;
@@ -272,6 +273,7 @@
       iframe,
       expectedOrigin,
       root,
+      userInteracted: Boolean(existing.userInteracted),
       lastPreviewUrl: existing.lastPreviewUrl || "",
       lastAppliedPreviewUrl: existing.lastAppliedPreviewUrl || "",
       pendingPreviewUrl: existing.pendingPreviewUrl || "",
@@ -282,7 +284,7 @@
     };
     iframeByWindow.set(iframe.contentWindow, linked);
     bindMediaObserver(linked);
-    if (linked.pendingPreviewUrl) {
+    if (linked.userInteracted && linked.pendingPreviewUrl) {
       tryApplyPendingPreview(linked);
     }
   }
@@ -294,11 +296,9 @@
     try {
       const embedUrl = buildEmbedUrl(root);
       if (!embedUrl) {
-        setStatus(root, "Missing app_base_url for embedded personalizer.", "pz-status--error");
+        console.error("[Personalizer Block] Missing app_base_url for embedded personalizer");
         return;
       }
-
-      setStatus(root, "Loading personalized customizer...", "pz-status--loading");
 
       const shell = document.createElement("div");
       shell.className = "pz-embed-shell";
@@ -317,7 +317,6 @@
 
       iframe.addEventListener("load", () => {
         bindIframeResize(iframe, embedUrl.origin, root);
-        setStatus(root, "Personalized UI loaded.", "pz-status--ok");
         setDebug(root, {
           src: iframe.src,
           templateId: root.dataset.templateId || "",
@@ -327,7 +326,7 @@
       });
     } catch (error) {
       root.dataset.pzMounted = "0";
-      setStatus(root, `Failed to initialize personalizer: ${error?.message || "Unknown error"}`, "pz-status--error");
+      console.error("[Personalizer Block] Failed to initialize personalizer", error);
     }
   }
 
@@ -384,8 +383,17 @@
       const previewUrl = String(payload.previewUrl || "");
       if (!previewUrl.startsWith("data:image/")) return;
       linked.pendingPreviewUrl = previewUrl;
+      if (!linked.userInteracted) return;
       if (previewUrl === linked.lastAppliedPreviewUrl) return;
       tryApplyPendingPreview(linked);
+      return;
+    }
+
+    if (payload.type === INTERACTION_EVENT) {
+      linked.userInteracted = true;
+      if (linked.pendingPreviewUrl) {
+        tryApplyPendingPreview(linked);
+      }
     }
   });
 

@@ -123,6 +123,7 @@ export default function CustomizerPage() {
   const resizeRef = useRef(null);
   const rotateRef = useRef(null);
   const lastParentPreviewTsRef = useRef(0);
+  const sentParentInteractionRef = useRef(false);
 
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -389,6 +390,23 @@ export default function CustomizerPage() {
           previewUrl,
           width,
           height,
+        },
+        "*"
+      );
+    } catch { }
+  }, [isEmbedded, activeProduct, embeddedContext.templateId]);
+
+  const notifyInteractionToParent = useCallback((payload = {}) => {
+    if (!isEmbedded || typeof window === "undefined") return;
+    if (window.parent === window) return;
+    if (sentParentInteractionRef.current) return;
+    sentParentInteractionRef.current = true;
+    try {
+      window.parent.postMessage(
+        {
+          type: "product-cloner:user-interacted",
+          templateId: String(activeProduct || embeddedContext.templateId || ""),
+          ...payload,
         },
         "*"
       );
@@ -744,6 +762,7 @@ export default function CustomizerPage() {
 
       if (data.success) {
         setActiveProduct(productId);
+        sentParentInteractionRef.current = false;
         setActiveProductMeta(meta?.success ? meta.product : null);
         setActiveImageIndex(0);
         setOptions(data.options);
@@ -860,6 +879,7 @@ export default function CustomizerPage() {
     setUploadingUploadOptionIds({});
     setUploadTransforms({});
     setFocusedUploadOptionId(null);
+    sentParentInteractionRef.current = false;
     latestTraceRef.current = null;
     draggingRef.current = null;
     resizeRef.current = null;
@@ -888,6 +908,11 @@ export default function CustomizerPage() {
     }
     setSelections(newSelections);
     setUserSelections(newUserSelections);
+    notifyInteractionToParent({
+      source: "selection",
+      optionId: String(optionCid || ""),
+      valueId: String(nextVal || ""),
+    });
     // One request for both visibility + render trace to minimize loading flashes.
     requestPreview(
       activeProduct,
