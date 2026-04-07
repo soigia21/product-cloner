@@ -31,6 +31,20 @@ function stripHtml(raw) {
     .trim();
 }
 
+function inferImportLinkType(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return "unknown";
+  try {
+    const parsed = new URL(value);
+    const path = String(parsed.pathname || "");
+    if (/\/products\/[^/?#]+/i.test(path)) return "product";
+    if (/\/collections\/[^/?#]+/i.test(path)) return "collection";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 function normalizeUploadTransform(raw) {
   const offsetX = Number(raw?.offsetX);
   const offsetY = Number(raw?.offsetY);
@@ -84,6 +98,13 @@ export default function CustomizerPage() {
 
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
+  const [inspectingLink, setInspectingLink] = useState(false);
+  const [batchImporting, setBatchImporting] = useState(false);
+  const [importTarget, setImportTarget] = useState(null);
+  const [collectionChecks, setCollectionChecks] = useState({});
+  const [batchProgress, setBatchProgress] = useState(null);
+  const [importPublish, setImportPublish] = useState(false);
+  const [adminView, setAdminView] = useState("import");
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishingProduct, setPublishingProduct] = useState(false);
   const [cleaningOld, setCleaningOld] = useState(false);
@@ -161,6 +182,20 @@ export default function CustomizerPage() {
   const activeMainImage = activeClonedImages[safeActiveImageIndex] || activeClonedImages[0] || null;
   const activeFirstVariant = activeClonedVariants[0] || null;
   const activeDescriptionText = stripHtml(activeClonedProduct?.bodyHtml || "");
+  const importLinkTypeHint = useMemo(() => inferImportLinkType(importUrl), [importUrl]);
+  const collectionProducts = useMemo(
+    () => (importTarget?.type === "collection" ? (importTarget.products || []) : []),
+    [importTarget]
+  );
+  const selectedCollectionCount = useMemo(() => {
+    if (!Array.isArray(collectionProducts) || collectionProducts.length === 0) return 0;
+    let count = 0;
+    for (const p of collectionProducts) {
+      const url = String(p?.url || "");
+      if (url && collectionChecks[url]) count += 1;
+    }
+    return count;
+  }, [collectionChecks, collectionProducts]);
 
   const uploadHolderByOptionId = useMemo(() => {
     const map = {};
@@ -706,47 +741,195 @@ export default function CustomizerPage() {
     focusedUploadOptionId,
   ]);
 
-  // Import product
-  const handleImport = async () => {
-    if (!importUrl.trim()) return;
+  const handleInspectImportUrl = async () => {
+    const nextUrl = String(importUrl || "").trim();
+    if (!nextUrl) return;
     if (storeInfo && !storeInfo.configured) {
       setError("Chưa cấu hình Shopify store");
       return;
     }
+
+    setInspectingLink(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const res = await fetch("/api/import/inspect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: nextUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success || !data?.target) {
+        setImportTarget(null);
+        setCollectionChecks({});
+        setError(data?.error || "Không thể phân tích link import");
+        return;
+      }
+
+      setImportTarget(data.target);
+      if (data.target.type === "collection") {
+        const nextChecks = {};
+        for (const product of data.target.products || []) {
+          const url = String(product?.url || "");
+          if (!url) continue;
+          nextChecks[url] = true;
+        }
+        setCollectionChecks(nextChecks);
+      } else {
+        setCollectionChecks({});
+      }
+    } catch {
+      setImportTarget(null);
+      setCollectionChecks({});
+      setError("Lỗi kết nối server");
+    } finally {
+      setInspectingLink(false);
+    }
+  };
+
+  const importOneProductUrl = async (productUrl) => {
+    const url = String(productUrl || "").trim();
+    if (!url) throw new Error("Thiếu product URL");
+
+    const res = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        publish: Boolean(importPublish),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.error || `Import thất bại: ${url}`);
+    }
+    return data;
+  };
+
+  const handleImportResolvedProduct = async () => {
+    const productUrl = String(importTarget?.product?.url || importTarget?.normalizedUrl || importUrl || "").trim();
+    if (!productUrl || importing) return;
+
     setImporting(true);
     setError(null);
     setNotice(null);
 
     try {
-      const res = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: importUrl }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        if (Array.isArray(data.warnings) && data.warnings.length > 0) {
-          setNotice(data.warnings.join(" | "));
-        }
-        setImportUrl("");
-        // Refresh products list
-        await refreshProducts();
-        // Auto-select the imported product
-        if (data.product?.id) {
-          await selectProduct(data.product.id);
-          setTimeout(() => {
-            cloneSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }, 60);
-        }
-      } else {
-        setError(data.error || "Import thất bại");
+      const data = await importOneProductUrl(productUrl);
+      if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+        setNotice(data.warnings.join(" | "));
       }
-    } catch (err) {
-      setError("Lỗi kết nối server");
+
+      await refreshProducts();
+      if (data.product?.id) {
+        await selectProduct(data.product.id);
+        setAdminView("products");
+        setTimeout(() => {
+          cloneSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 60);
+      }
+    } catch (error) {
+      setError(error?.message || "Import thất bại");
     } finally {
       setImporting(false);
     }
+  };
+
+  const handleToggleAllCollection = (checked) => {
+    const next = {};
+    for (const product of collectionProducts) {
+      const url = String(product?.url || "");
+      if (!url) continue;
+      next[url] = Boolean(checked);
+    }
+    setCollectionChecks(next);
+  };
+
+  const handleCollectionCheck = (url, checked) => {
+    const key = String(url || "");
+    if (!key) return;
+    setCollectionChecks((prev) => ({
+      ...prev,
+      [key]: Boolean(checked),
+    }));
+  };
+
+  const handleImportCollectionSelected = async () => {
+    if (batchImporting) return;
+    const selected = collectionProducts.filter((p) => collectionChecks[String(p?.url || "")]);
+    if (selected.length === 0) {
+      setError("Chưa chọn product nào để import");
+      return;
+    }
+
+    setBatchImporting(true);
+    setError(null);
+    setNotice(null);
+    setBatchProgress({
+      total: selected.length,
+      done: 0,
+      success: 0,
+      failed: 0,
+      current: "",
+      errors: [],
+    });
+
+    let success = 0;
+    let failed = 0;
+    const errors = [];
+    let lastImportedId = "";
+    const warningBag = [];
+
+    for (let i = 0; i < selected.length; i += 1) {
+      const item = selected[i];
+      const url = String(item?.url || "");
+      setBatchProgress({
+        total: selected.length,
+        done: i,
+        success,
+        failed,
+        current: url,
+        errors,
+      });
+
+      try {
+        const data = await importOneProductUrl(url);
+        success += 1;
+        if (data?.product?.id) lastImportedId = String(data.product.id);
+        if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
+          warningBag.push(`${item?.title || url}: ${data.warnings.join(" | ")}`);
+        }
+      } catch (error) {
+        failed += 1;
+        errors.push(`${item?.title || url}: ${error?.message || "Import failed"}`);
+      }
+    }
+
+    setBatchProgress({
+      total: selected.length,
+      done: selected.length,
+      success,
+      failed,
+      current: "",
+      errors,
+    });
+
+    try {
+      await refreshProducts();
+      if (lastImportedId) {
+        await selectProduct(lastImportedId);
+      }
+      setAdminView("products");
+    } catch { }
+
+    if (warningBag.length > 0 || errors.length > 0) {
+      setNotice([...warningBag, ...errors].join(" | "));
+    } else {
+      setNotice(`Import thành công ${success}/${selected.length} products.`);
+    }
+
+    setBatchImporting(false);
   };
 
   // Select a product
@@ -1480,13 +1663,32 @@ export default function CustomizerPage() {
 
   return (
     <div className={`customizer-page ${isEmbedded ? "embedded-mode" : ""}`}>
-      {/* Import Section */}
       {!isEmbedded && (
+        <div className="admin-nav">
+          <button
+            type="button"
+            className={`admin-nav-btn ${adminView === "import" ? "active" : ""}`}
+            onClick={() => setAdminView("import")}
+          >
+            Import
+          </button>
+          <button
+            type="button"
+            className={`admin-nav-btn ${adminView === "products" ? "active" : ""}`}
+            onClick={() => setAdminView("products")}
+          >
+            Product Added
+          </button>
+        </div>
+      )}
+
+      {/* Import Section */}
+      {!isEmbedded && adminView === "import" && (
         <div className="import-section">
           <div className="import-card">
-            <h2>🧩 Product + Personalized Importer</h2>
+            <h2>🧩 Import Product / Collection</h2>
             <p className="subtitle">
-              Nhập link sản phẩm Shopify có Customily → Import sẽ tự tạo Shopify Draft
+              Dán link product hoặc collection. Hệ thống sẽ tự nhận dạng và cho phép import hàng loạt.
             </p>
             {storeInfo?.configured ? (
               <div className="store-badge" style={{ marginBottom: 10 }}>
@@ -1500,24 +1702,144 @@ export default function CustomizerPage() {
                 </div>
               </div>
             )}
+
             <div className="import-bar">
               <input
                 type="url"
                 value={importUrl}
-                onChange={(e) => setImportUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !importing && handleImport()}
-                placeholder="https://macorner.co/products/..."
-                disabled={importing || (storeInfo && !storeInfo.configured)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  setImportUrl(nextValue);
+                  setImportTarget(null);
+                  setCollectionChecks({});
+                  setBatchProgress(null);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && !inspectingLink && handleInspectImportUrl()}
+                placeholder="https://macorner.co/products/... hoặc /collections/..."
+                disabled={inspectingLink || importing || batchImporting || (storeInfo && !storeInfo.configured)}
               />
               <button
                 className="btn btn-primary"
-                onClick={handleImport}
-                disabled={!importUrl.trim() || importing || (storeInfo && !storeInfo.configured)}
+                onClick={handleInspectImportUrl}
+                disabled={!importUrl.trim() || inspectingLink || importing || batchImporting || (storeInfo && !storeInfo.configured)}
               >
-                {importing ? <span className="spinner"></span> : "📥"}
-                {importing ? "Importing..." : "Import + Create Draft"}
+                {inspectingLink ? <span className="spinner"></span> : "🔎"}
+                {inspectingLink ? "Scanning..." : "Detect Link"}
               </button>
             </div>
+
+            <div className="import-type-hint">
+              Nhận dạng:{" "}
+              <strong>
+                {importLinkTypeHint === "product"
+                  ? "Product"
+                  : importLinkTypeHint === "collection"
+                    ? "Collection"
+                    : "Unknown"}
+              </strong>
+            </div>
+
+            <label className="import-public-toggle">
+              <input
+                type="checkbox"
+                checked={importPublish}
+                onChange={(e) => setImportPublish(Boolean(e.target.checked))}
+                disabled={importing || batchImporting}
+              />
+              <span>Public ngay khi import</span>
+            </label>
+
+            {importTarget?.type === "product" && (
+              <div className="import-result-card">
+                <div className="import-result-title">
+                  {importTarget?.product?.title || importTarget?.product?.handle || "Detected Product"}
+                </div>
+                <div className="import-result-meta">
+                  <span>{importTarget?.product?.variantsCount || 0} variants</span>
+                  <span>{importTarget?.normalizedUrl}</span>
+                </div>
+                <button
+                  className="btn btn-success btn-sm"
+                  onClick={handleImportResolvedProduct}
+                  disabled={importing || batchImporting}
+                >
+                  {importing ? "Đang import..." : importPublish ? "Import + Public" : "Import + Draft"}
+                </button>
+              </div>
+            )}
+
+            {importTarget?.type === "collection" && (
+              <div className="collection-import-panel">
+                <div className="collection-import-head">
+                  <div>
+                    <strong>Collection:</strong> {importTarget?.collection?.handle}
+                  </div>
+                  <div>
+                    {selectedCollectionCount}/{collectionProducts.length} selected
+                  </div>
+                </div>
+
+                <div className="collection-import-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleToggleAllCollection(true)}
+                    disabled={batchImporting}
+                  >
+                    Tick All
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleToggleAllCollection(false)}
+                    disabled={batchImporting}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-success btn-sm"
+                    onClick={handleImportCollectionSelected}
+                    disabled={batchImporting || selectedCollectionCount === 0}
+                  >
+                    {batchImporting
+                      ? `Importing ${batchProgress?.done || 0}/${batchProgress?.total || selectedCollectionCount}...`
+                      : (importPublish ? "Import Selected + Public" : "Import Selected + Draft")}
+                  </button>
+                </div>
+
+                {batchProgress && (
+                  <div className="collection-import-progress">
+                    <span>Total: {batchProgress.total}</span>
+                    <span>Done: {batchProgress.done}</span>
+                    <span>Success: {batchProgress.success}</span>
+                    <span>Failed: {batchProgress.failed}</span>
+                    {batchProgress.current ? <span>Current: {batchProgress.current}</span> : null}
+                  </div>
+                )}
+
+                <div className="collection-products-list">
+                  {collectionProducts.map((product) => {
+                    const url = String(product?.url || "");
+                    const checked = Boolean(collectionChecks[url]);
+                    return (
+                      <label key={url} className="collection-product-row">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => handleCollectionCheck(url, e.target.checked)}
+                          disabled={batchImporting}
+                        />
+                        <div className="collection-product-main">
+                          <div className="collection-product-title">{product?.title || product?.handle || url}</div>
+                          <div className="collection-product-url">{url}</div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1542,7 +1864,7 @@ export default function CustomizerPage() {
       )}
 
       {/* Products Grid */}
-      {!isEmbedded && products.length > 0 && (
+      {!isEmbedded && adminView === "products" && products.length > 0 && (
         <>
           <div className="products-toolbar">
             <button
@@ -1586,7 +1908,13 @@ export default function CustomizerPage() {
         </>
       )}
 
-      {!isEmbedded && activeProductRecord && (
+      {!isEmbedded && adminView === "products" && products.length === 0 && (
+        <div className="empty-products">
+          Chưa có product nào được import. Chuyển qua tab <strong>Import</strong> để thêm mới.
+        </div>
+      )}
+
+      {!isEmbedded && adminView === "products" && activeProductRecord && (
         <div className="clone-summary-card" ref={cloneSummaryRef}>
           <div className="clone-summary-media">
             {activeProductRecord?.cloneSource?.image ? (
@@ -1645,7 +1973,7 @@ export default function CustomizerPage() {
         </div>
       )}
 
-      {!isEmbedded && activeClonedProduct && (
+      {!isEmbedded && adminView === "products" && activeClonedProduct && (
         <div className="product-detail-card">
           <div className="product-detail-gallery">
             <div className="product-detail-main-image">
@@ -1753,7 +2081,7 @@ export default function CustomizerPage() {
       )}
 
       {/* Customizer Layout */}
-      {activeProduct && options.length > 0 && (
+      {activeProduct && options.length > 0 && (isEmbedded || adminView === "products") && (
         <div className={`customizer-layout ${hideEmbeddedPreview ? "without-preview" : ""}`}>
           {/* Left: Preview */}
           {hideEmbeddedPreview ? (

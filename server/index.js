@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { scrapeProduct } from "./services/product-scraper.js";
 import { createProduct, updateProductStatus, upsertProductTemplateMetafield } from "./services/product-creator.js";
 import { extractCustomilyProduct } from "./services/customily-extractor.js";
+import { inspectImportTarget } from "./services/import-inspector.js";
 import {
   importProduct,
   listProducts,
@@ -377,7 +378,7 @@ app.use("/proxy/:id/*", proxyOriginalPage);
  * POST /api/import — Import a Customily product
  */
 app.post("/api/import", async (req, res) => {
-  const { url } = req.body;
+  const { url, publish } = req.body;
   if (!url) return res.status(400).json({ error: "Thiếu URL sản phẩm" });
   const cfg = getShopifyConfig();
   if (!cfg.configured) {
@@ -390,24 +391,24 @@ app.post("/api/import", async (req, res) => {
     ]);
 
     const tokenInfo = await getToken();
-    const draftResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, {
-      status: "draft",
+    const cloneResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, {
+      status: publish ? "active" : "draft",
       defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
       forcePhysicalProduct: true,
     });
-    const shopifyClone = buildCloneMetadataFromResult(draftResult);
+    const shopifyClone = buildCloneMetadataFromResult(cloneResult);
     const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
     const clonedProduct = buildClonedProductSnapshot(scrapedProduct, url);
     const warnings = [];
-    for (const w of draftResult.inventoryWarnings || []) {
+    for (const w of cloneResult.inventoryWarnings || []) {
       warnings.push(`Inventory warning: ${w}`);
     }
-    for (const w of draftResult.publishWarnings || []) {
+    for (const w of cloneResult.publishWarnings || []) {
       warnings.push(w);
     }
     let templateMetafield = null;
     try {
-      templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, draftResult.productId);
+      templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, cloneResult.productId);
     } catch (metaError) {
       warnings.push(`Không thể sync metafield personalizer.template_id: ${metaError.message}`);
     }
@@ -439,6 +440,64 @@ app.post("/api/import", async (req, res) => {
   } catch (error) {
     console.error("Import error:", error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/import/inspect — Detect product/collection and return import candidates.
+ */
+app.post("/api/import/inspect", async (req, res) => {
+  const { url } = req.body || {};
+  if (!url) return res.status(400).json({ success: false, error: "Thiếu URL" });
+
+  try {
+    const target = await inspectImportTarget(url);
+
+    if (target.type === "product") {
+      let preview = null;
+      try {
+        const scraped = await scrapeProduct(target.product.url);
+        preview = {
+          title: scraped?.title || target.product.handle,
+          image: scraped?.images?.[0]?.src || "",
+          variantsCount: Array.isArray(scraped?.variants) ? scraped.variants.length : 0,
+        };
+      } catch {
+        preview = {
+          title: target.product.handle,
+          image: "",
+          variantsCount: 0,
+        };
+      }
+
+      return res.json({
+        success: true,
+        target: {
+          type: "product",
+          normalizedUrl: target.normalizedUrl,
+          product: {
+            ...target.product,
+            ...preview,
+          },
+        },
+      });
+    }
+
+    return res.json({
+      success: true,
+      target: {
+        type: "collection",
+        normalizedUrl: target.normalizedUrl,
+        collection: target.collection,
+        products: target.products || [],
+        source: target.source || "",
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: error.message || "Không thể phân tích URL import",
+    });
   }
 });
 
