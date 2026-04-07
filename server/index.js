@@ -378,7 +378,7 @@ app.use("/proxy/:id/*", proxyOriginalPage);
  * POST /api/import — Import a Customily product
  */
 app.post("/api/import", async (req, res) => {
-  const { url, publish } = req.body;
+  const { url, publish, vendor } = req.body;
   if (!url) return res.status(400).json({ error: "Thiếu URL sản phẩm" });
   const cfg = getShopifyConfig();
   if (!cfg.configured) {
@@ -389,16 +389,20 @@ app.post("/api/import", async (req, res) => {
       importProduct(url),
       scrapeProduct(url),
     ]);
+    const vendorOverride = String(vendor || "").trim();
+    const effectiveProduct = vendorOverride
+      ? { ...scrapedProduct, vendor: vendorOverride }
+      : scrapedProduct;
 
     const tokenInfo = await getToken();
-    const cloneResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, scrapedProduct, {
+    const cloneResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, effectiveProduct, {
       status: publish ? "active" : "draft",
       defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
       forcePhysicalProduct: true,
     });
     const shopifyClone = buildCloneMetadataFromResult(cloneResult);
-    const cloneSource = buildCloneSourceFromScraped(scrapedProduct, url);
-    const clonedProduct = buildClonedProductSnapshot(scrapedProduct, url);
+    const cloneSource = buildCloneSourceFromScraped(effectiveProduct, url);
+    const clonedProduct = buildClonedProductSnapshot(effectiveProduct, url);
     const warnings = [];
     for (const w of cloneResult.inventoryWarnings || []) {
       warnings.push(`Inventory warning: ${w}`);

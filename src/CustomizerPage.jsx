@@ -104,6 +104,7 @@ export default function CustomizerPage() {
   const [collectionChecks, setCollectionChecks] = useState({});
   const [batchProgress, setBatchProgress] = useState(null);
   const [importPublish, setImportPublish] = useState(false);
+  const [importVendor, setImportVendor] = useState("");
   const [adminView, setAdminView] = useState("import");
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishingProduct, setPublishingProduct] = useState(false);
@@ -798,6 +799,7 @@ export default function CustomizerPage() {
       body: JSON.stringify({
         url,
         publish: Boolean(importPublish),
+        vendor: String(importVendor || "").trim(),
       }),
     });
     const data = await res.json();
@@ -1737,6 +1739,18 @@ export default function CustomizerPage() {
                     ? "Collection"
                     : "Unknown"}
               </strong>
+            </div>
+
+            <div className="import-vendor-row">
+              <label htmlFor="import-vendor-input">Vendor (optional override)</label>
+              <input
+                id="import-vendor-input"
+                type="text"
+                value={importVendor}
+                onChange={(e) => setImportVendor(e.target.value)}
+                placeholder="Ví dụ: Alienscustom"
+                disabled={inspectingLink || importing || batchImporting}
+              />
             </div>
 
             <label className="import-public-toggle">

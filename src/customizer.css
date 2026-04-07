@@ -115,6 +115,32 @@
   font-size: 13px;
 }
 
+.import-vendor-row {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.import-vendor-row label {
+  font-size: 12px;
+  color: var(--text-secondary, #c5c7d0);
+}
+
+.import-vendor-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text, #fff);
+  font-size: 13px;
+  outline: none;
+}
+
+.import-vendor-row input:focus {
+  border-color: var(--primary, #6366f1);
+}
+
 .import-public-toggle {
   display: inline-flex;
   align-items: center;
