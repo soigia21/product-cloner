@@ -32,6 +32,70 @@ const UPLOADS_DIR = path.resolve(process.cwd(), "data", "uploads");
 const DEFAULT_IMPORTED_INVENTORY_QUANTITY = Number.isFinite(Number(process.env.DEFAULT_IMPORTED_INVENTORY_QUANTITY))
   ? Math.max(0, Math.floor(Number(process.env.DEFAULT_IMPORTED_INVENTORY_QUANTITY)))
   : 999;
+const IMPORT_RETRY_ATTEMPTS = 3;
+const IMPORT_RETRY_BASE_MS = 900;
+const IMPORT_RETRY_MAX_MS = 6500;
+const inflightImportJobs = new Map();
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function normalizeImportProductUrl(rawUrl) {
+  const parsed = new URL(String(rawUrl || "").trim());
+  parsed.hash = "";
+  parsed.search = "";
+
+  const match = String(parsed.pathname || "").match(/\/products\/([^/?#]+)/i);
+  if (match) {
+    const handle = decodeURIComponent(match[1]);
+    return `${parsed.origin}/products/${encodeURIComponent(handle)}`.toLowerCase();
+  }
+
+  const cleanPath = String(parsed.pathname || "").replace(/\/+$/, "") || "/";
+  return `${parsed.origin}${cleanPath}`.toLowerCase();
+}
+
+function isRetryableImportError(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  return (
+    msg.includes("429") ||
+    msg.includes("too many requests") ||
+    msg.includes("rate limit") ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket hang up") ||
+    msg.includes("fetch failed") ||
+    msg.includes("502") ||
+    msg.includes("503") ||
+    msg.includes("504")
+  );
+}
+
+async function retryImportStep(stepName, fn, options = {}) {
+  const attempts = Math.max(1, Number(options.attempts) || IMPORT_RETRY_ATTEMPTS);
+  const baseMs = Math.max(50, Number(options.baseMs) || IMPORT_RETRY_BASE_MS);
+  const maxMs = Math.max(baseMs, Number(options.maxMs) || IMPORT_RETRY_MAX_MS);
+
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts || !isRetryableImportError(error)) {
+        throw error;
+      }
+      const backoff = Math.min(maxMs, baseMs * (2 ** (attempt - 1)));
+      const jitter = Math.floor(backoff * (0.15 + Math.random() * 0.25));
+      const waitMs = backoff + jitter;
+      console.warn(`[import][${stepName}] attempt ${attempt}/${attempts} failed, retry in ${waitMs}ms: ${error?.message || error}`);
+      await sleep(waitMs);
+    }
+  }
+  throw lastError || new Error(`Import step failed: ${stepName}`);
+}
 
 function buildCloneMetadataFromResult(result = {}) {
   return {
@@ -96,6 +160,24 @@ function buildClonedProductSnapshot(scrapedProduct = {}, sourceUrl = "") {
     sourceUrl,
     importedAt: new Date().toISOString(),
   };
+}
+
+function patchImportStatus(importedId, patch = {}) {
+  const id = String(importedId || "").trim();
+  if (!id) return;
+  try {
+    const current = loadProduct(id);
+    const previous = current?.importStatus || {};
+    updateProductMetadata(id, {
+      importStatus: {
+        ...previous,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.warn(`[import] Cannot patch import status for ${id}: ${error?.message || error}`);
+  }
 }
 
 function normalizeNumericShopifyId(value) {
@@ -384,22 +466,97 @@ app.post("/api/import", async (req, res) => {
   if (!cfg.configured) {
     return res.status(500).json({ success: false, error: "Chưa cấu hình Shopify store" });
   }
+
+  let importKey = "";
   try {
-    const [importedProduct, scrapedProduct] = await Promise.all([
-      importProduct(url),
-      scrapeProduct(url),
-    ]);
+    importKey = normalizeImportProductUrl(url);
+  } catch {
+    return res.status(400).json({ success: false, error: "URL sản phẩm không hợp lệ" });
+  }
+
+  const running = inflightImportJobs.get(importKey);
+  if (running) {
+    return res.status(409).json({
+      success: false,
+      error: "Import cho product này đang chạy ở luồng khác, vui lòng chờ",
+      importKey,
+      startedAt: running.startedAt,
+      requestId: running.requestId,
+    });
+  }
+
+  const requestId = crypto.randomUUID();
+  inflightImportJobs.set(importKey, {
+    requestId,
+    startedAt: new Date().toISOString(),
+  });
+
+  let importedProduct = null;
+  let scrapedProduct = null;
+  let currentStep = "init";
+
+  try {
+    currentStep = "import_personalized_data";
+    importedProduct = await retryImportStep("importProduct", () => importProduct(url));
+    patchImportStatus(importedProduct.id, {
+      state: "imported_personalized_data",
+      importKey,
+      requestId,
+      currentStep,
+      startedAt: new Date().toISOString(),
+      lastError: "",
+    });
+
+    const existingImported = loadProduct(importedProduct.id);
+    if (existingImported?.shopifyClone?.productId) {
+      patchImportStatus(importedProduct.id, {
+        state: "complete",
+        currentStep: "reuse_existing_shopify_clone",
+        reusedExisting: true,
+        completedAt: new Date().toISOString(),
+        lastError: "",
+      });
+      return res.json({
+        success: true,
+        reused: true,
+        product: {
+          id: importedProduct.id,
+          optionsCount: importedProduct.options.length,
+          variantsCount: Object.keys(importedProduct.variantDesigns).length,
+          shopifyClone: existingImported.shopifyClone || null,
+          cloneSource: existingImported.cloneSource || null,
+          templateMetafield: existingImported.personalizer?.metafield || null,
+        },
+        warnings: ["Đã có Shopify clone trước đó, bỏ qua tạo product mới để tránh duplicate"],
+      });
+    }
+
+    currentStep = "scrape_source_product";
+    scrapedProduct = await retryImportStep("scrapeProduct", () => scrapeProduct(url));
     const vendorOverride = String(vendor || "").trim();
     const effectiveProduct = vendorOverride
       ? { ...scrapedProduct, vendor: vendorOverride }
       : scrapedProduct;
 
-    const tokenInfo = await getToken();
-    const cloneResult = await createProduct(cfg.storeDomain, tokenInfo.accessToken, effectiveProduct, {
-      status: publish ? "active" : "draft",
-      defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
-      forcePhysicalProduct: true,
+    patchImportStatus(importedProduct.id, {
+      state: "creating_shopify_clone",
+      currentStep,
+      vendorOverride: vendorOverride || "",
+      publishRequested: Boolean(publish),
     });
+
+    currentStep = "resolve_shopify_token";
+    const tokenInfo = await retryImportStep("getToken", () => getToken(), { attempts: 2 });
+
+    currentStep = "create_shopify_product";
+    const cloneResult = await retryImportStep(
+      "createProduct",
+      () => createProduct(cfg.storeDomain, tokenInfo.accessToken, effectiveProduct, {
+        status: publish ? "active" : "draft",
+        defaultInventoryQuantity: DEFAULT_IMPORTED_INVENTORY_QUANTITY,
+        forcePhysicalProduct: true,
+      })
+    );
     const shopifyClone = buildCloneMetadataFromResult(cloneResult);
     const cloneSource = buildCloneSourceFromScraped(effectiveProduct, url);
     const clonedProduct = buildClonedProductSnapshot(effectiveProduct, url);
@@ -411,8 +568,13 @@ app.post("/api/import", async (req, res) => {
       warnings.push(w);
     }
     let templateMetafield = null;
+    currentStep = "sync_template_metafield";
     try {
-      templateMetafield = await syncTemplateMetafieldToShopify(importedProduct.id, cloneResult.productId);
+      templateMetafield = await retryImportStep(
+        "syncTemplateMetafield",
+        () => syncTemplateMetafieldToShopify(importedProduct.id, cloneResult.productId),
+        { attempts: 2 }
+      );
     } catch (metaError) {
       warnings.push(`Không thể sync metafield personalizer.template_id: ${metaError.message}`);
     }
@@ -427,6 +589,14 @@ app.post("/api/import", async (req, res) => {
           templateId: importedProduct.id,
         }
         : undefined,
+      importStatus: {
+        state: "complete",
+        currentStep: "done",
+        importKey,
+        requestId,
+        completedAt: new Date().toISOString(),
+        lastError: "",
+      },
     });
 
     res.json({
@@ -443,7 +613,24 @@ app.post("/api/import", async (req, res) => {
     });
   } catch (error) {
     console.error("Import error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    if (importedProduct?.id) {
+      patchImportStatus(importedProduct.id, {
+        state: "failed",
+        currentStep,
+        importKey,
+        requestId,
+        failedAt: new Date().toISOString(),
+        lastError: error?.message || String(error),
+      });
+    }
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      importId: importedProduct?.id || "",
+      step: currentStep,
+    });
+  } finally {
+    inflightImportJobs.delete(importKey);
   }
 });
 
