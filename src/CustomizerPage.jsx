@@ -96,6 +96,26 @@ export default function CustomizerPage() {
   }, []);
   const isEmbedded = Boolean(embeddedContext.embedded);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const body = document.body;
+    const html = document.documentElement;
+    if (!body || !html) return undefined;
+
+    if (isEmbedded) {
+      body.classList.add("pz-embedded-body");
+      html.classList.add("pz-embedded-html");
+    } else {
+      body.classList.remove("pz-embedded-body");
+      html.classList.remove("pz-embedded-html");
+    }
+
+    return () => {
+      body.classList.remove("pz-embedded-body");
+      html.classList.remove("pz-embedded-html");
+    };
+  }, [isEmbedded]);
+
   const [importUrl, setImportUrl] = useState("");
   const [importing, setImporting] = useState(false);
   const [inspectingLink, setInspectingLink] = useState(false);

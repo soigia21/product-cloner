@@ -13,7 +13,9 @@
   data-product-handle="{{ product.handle | escape }}"
   data-app-base-url="{{ block.settings.app_base_url | escape }}"
   data-show-debug="{{ block.settings.show_debug }}"
-></div>
+>
+  <h3 class="pz-theme-title">Personalized</h3>
+</div>
 
 <style>
   .pz-theme-block {
@@ -28,6 +30,14 @@
     background: transparent;
     color: var(--pz-text);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .pz-theme-title {
+    margin: 0 0 12px;
+    text-align: center;
+    font-size: 24px;
+    line-height: 1.2;
+    font-weight: 700;
+    color: inherit;
   }
   .pz-debug {
     margin-top: 12px;
@@ -51,7 +61,6 @@
   }
   .pz-embed-frame {
     width: 100%;
-    min-height: 220px;
     border: 0;
     display: block;
     background: transparent;

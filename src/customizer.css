@@ -2,6 +2,12 @@
    Customizer Page Styles
    =================================== */
 
+html.pz-embedded-html,
+body.pz-embedded-body,
+body.pz-embedded-body #root {
+  background: transparent !important;
+}
+
 .customizer-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -11,6 +17,7 @@
 .customizer-page.embedded-mode {
   max-width: 100%;
   padding: 8px;
+  background: transparent;
 }
 
 .admin-nav {

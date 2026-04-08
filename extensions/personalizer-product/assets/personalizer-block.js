@@ -4,9 +4,9 @@
   const EMBED_EVENT = "product-cloner:embedded-resize";
   const PREVIEW_EVENT = "product-cloner:preview-updated";
   const INTERACTION_EVENT = "product-cloner:user-interacted";
-  const MIN_HEIGHT = 220;
+  const MIN_HEIGHT = 0;
   const MAX_HEIGHT = 2200;
-  const DEFAULT_HEIGHT = 760;
+  const DEFAULT_HEIGHT = 220;
   const PREVIEW_RETRY_DELAY_MS = 240;
   const PREVIEW_RETRY_MAX_ATTEMPTS = 28;
   const MEDIA_MUTATION_DEBOUNCE_MS = 120;
