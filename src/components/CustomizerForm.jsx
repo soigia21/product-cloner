@@ -158,7 +158,7 @@ function DropdownOption({ option, selectedValue, onSelect }) {
       required={isRequiredOption(option)}
       aria-required={isRequiredOption(option)}
     >
-      {!selectedValue && <option value="">Chọn...</option>}
+      {!selectedValue && <option value="">Select...</option>}
       {sortedValues.map((val) => (
         <option key={val.id} value={String(val.id)}>
           {val.value}
@@ -172,7 +172,7 @@ function TextInputOption({ option, value, onChange }) {
   const maxLength = Number.isFinite(Number(option?.max_length))
     ? Number(option.max_length)
     : 20;
-  const placeholder = option?.placeholder || option?.label || "Nhập tên...";
+  const placeholder = option?.placeholder || option?.label || "Enter name...";
   const helpText = option?.help_text || "";
 
   return (
@@ -244,7 +244,7 @@ function ImageUploadOption({
           className={`btn btn-ghost btn-sm upload-action ${uploading ? "disabled" : ""}`}
           aria-disabled={uploading ? "true" : "false"}
         >
-          {uploading ? "Đang upload..." : uploadedUrl ? "Thay ảnh" : "Chọn ảnh"}
+          {uploading ? "Uploading..." : uploadedUrl ? "Replace image" : "Choose image"}
         </label>
         {uploadedUrl ? (
           <button
@@ -253,7 +253,7 @@ function ImageUploadOption({
             onClick={onClear}
             disabled={uploading}
           >
-            Xóa ảnh
+            Remove
           </button>
         ) : null}
       </div>
@@ -277,12 +277,12 @@ function ImageUploadOption({
           className={`image-upload-preview upload-preview-trigger ${isEditing ? "is-editing" : ""}`}
           onClick={onActivateEdit}
           disabled={uploading}
-          title="Click để bật chỉnh ảnh trên preview"
+          title="Click to enable image editing"
         >
           <img src={uploadedUrl} alt={uploadedName || option.label || "Uploaded image"} />
         </button>
       ) : (
-        <div className="image-upload-empty">Chưa có ảnh được upload</div>
+        <div className="image-upload-empty">No image uploaded yet</div>
       )}
 
       {uploadedName ? <div className="text-input-hint">{uploadedName}</div> : null}

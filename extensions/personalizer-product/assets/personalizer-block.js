@@ -357,16 +357,32 @@
 
   function resolveMainImageHost(root) {
     const targets = collectFeaturedImages(root);
-    if (!targets || targets.length === 0) return null;
-    const image = targets[0];
-    const host =
-      image.closest(
+    if (targets && targets.length > 0) {
+      const image = targets[0];
+      const host =
+        image.closest(
+          "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery, media-gallery"
+        ) ||
+        image.parentElement ||
+        null;
+      if (host instanceof HTMLElement) {
+        return { image, host };
+      }
+    }
+
+    const section = getRootSection(root) || document;
+    const fallback = section.querySelector(
+      "media-gallery img, .product__media img, [data-product-media-container] img, [data-product-media] img, [data-media-id] img, .featured-media img, .product-gallery img, .product-single__media img, img.product-featured-media"
+    );
+    if (!(fallback instanceof HTMLImageElement)) return null;
+    const fallbackHost =
+      fallback.closest(
         "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery, media-gallery"
       ) ||
-      image.parentElement ||
+      fallback.parentElement ||
       null;
-    if (!(host instanceof HTMLElement)) return null;
-    return { image, host };
+    if (!(fallbackHost instanceof HTMLElement)) return null;
+    return { image: fallback, host: fallbackHost };
   }
 
   function syncMainEditBar(linked) {
@@ -657,6 +673,20 @@
 
     if (payload.type === INTERACTION_EVENT) {
       linked.userInteracted = true;
+      const source = String(payload.source || "");
+      if (source === "upload-focus") {
+        linked.editState = {
+          editable: true,
+          optionId: String(payload.optionId || ""),
+          transform: linked.editState?.transform || normalizeEditTransform({}),
+        };
+      } else if (source === "upload-clear") {
+        linked.editState = {
+          editable: false,
+          optionId: "",
+          transform: linked.editState?.transform || normalizeEditTransform({}),
+        };
+      }
       if (linked.pendingPreviewUrl) {
         tryApplyPendingPreview(linked);
       }

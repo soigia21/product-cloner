@@ -10,7 +10,7 @@ function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Không thể đọc file ảnh"));
+    reader.onerror = () => reject(new Error("Unable to read image file"));
     reader.readAsDataURL(file);
   });
 }
@@ -732,7 +732,7 @@ export default function CustomizerPage() {
           await selectProduct(embeddedTemplateId);
           return;
         }
-        setError("Không tìm thấy template personalized cho product này.");
+        setError("Personalized template not found for this product.");
         return;
       }
 
@@ -747,7 +747,7 @@ export default function CustomizerPage() {
     };
 
     boot().catch(() => {
-      if (!canceled) setError("Không thể khởi tạo personalized UI");
+      if (!canceled) setError("Unable to initialize personalized UI");
     });
 
     return () => {
@@ -799,7 +799,7 @@ export default function CustomizerPage() {
     const nextUrl = String(importUrl || "").trim();
     if (!nextUrl) return;
     if (storeInfo && !storeInfo.configured) {
-      setError("Chưa cấu hình Shopify store");
+      setError("Shopify store is not configured");
       return;
     }
 
@@ -819,7 +819,7 @@ export default function CustomizerPage() {
         setCollectionChecks({});
         setCollectionImportResults({});
         setCollectionResultFilter("all");
-        setError(data?.error || "Không thể phân tích link import");
+        setError(data?.error || "Unable to inspect import link");
         return;
       }
 
@@ -846,7 +846,7 @@ export default function CustomizerPage() {
       setCollectionChecks({});
       setCollectionImportResults({});
       setCollectionResultFilter("all");
-      setError("Lỗi kết nối server");
+      setError("Server connection error");
     } finally {
       setInspectingLink(false);
     }
@@ -854,7 +854,7 @@ export default function CustomizerPage() {
 
   const importOneProductUrl = async (productUrl) => {
     const url = String(productUrl || "").trim();
-    if (!url) throw new Error("Thiếu product URL");
+    if (!url) throw new Error("Missing product URL");
 
     const res = await fetch("/api/import", {
       method: "POST",
@@ -868,7 +868,7 @@ export default function CustomizerPage() {
     });
     const data = await res.json();
     if (!res.ok || !data?.success) {
-      throw new Error(data?.error || `Import thất bại: ${url}`);
+      throw new Error(data?.error || `Import failed: ${url}`);
     }
     return data;
   };
@@ -896,7 +896,7 @@ export default function CustomizerPage() {
         }, 60);
       }
     } catch (error) {
-      setError(error?.message || "Import thất bại");
+      setError(error?.message || "Import failed");
     } finally {
       setImporting(false);
     }
@@ -933,7 +933,7 @@ export default function CustomizerPage() {
     if (batchImporting) return;
     const selected = filteredCollectionProducts.filter((p) => collectionChecks[String(p?.url || "")]);
     if (selected.length === 0) {
-      setError("Chưa chọn product nào để import");
+      setError("No products selected for import");
       return;
     }
 
@@ -1050,7 +1050,7 @@ export default function CustomizerPage() {
     if (warningBag.length > 0 || errors.length > 0) {
       setNotice([...warningBag, ...errors].join(" | "));
     } else {
-      setNotice(`Import thành công ${success}/${selected.length} products.`);
+      setNotice(`Successfully imported ${success}/${selected.length} products.`);
     }
 
     setBatchImporting(false);
@@ -1096,7 +1096,7 @@ export default function CustomizerPage() {
         });
       }
     } catch (err) {
-      setError("Không thể load options");
+      setError("Unable to load options");
     }
   };
 
@@ -1268,7 +1268,7 @@ export default function CustomizerPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.success || !data?.upload?.url) {
-        throw new Error(data?.error || "Upload ảnh thất bại");
+        throw new Error(data?.error || "Image upload failed");
       }
       const nextUploads = { ...uploadInputs, [optionCid]: data.upload };
       const nextTransforms = {
@@ -1287,7 +1287,7 @@ export default function CustomizerPage() {
         uploadTransforms: buildUploadTransformsByHolder(nextTransforms),
       });
     } catch (err) {
-      setError(err?.message || "Không thể upload ảnh");
+      setError(err?.message || "Unable to upload image");
     } finally {
       setUploadingUploadOptionIds((prev) => {
         const next = { ...prev };
@@ -1750,7 +1750,7 @@ export default function CustomizerPage() {
 
   const handleCleanupOld = async () => {
     if (cleaningOld || products.length <= 1) return;
-    const ok = window.confirm("Xóa các personalized cũ và chỉ giữ lại bản import mới nhất?");
+    const ok = window.confirm("Delete old personalized imports and keep only the latest?");
     if (!ok) return;
 
     setCleaningOld(true);
@@ -1764,7 +1764,7 @@ export default function CustomizerPage() {
       });
       const data = await res.json();
       if (!data.success) {
-        setError(data.error || "Không thể xóa personalized cũ");
+        setError(data.error || "Unable to delete old personalized imports");
         return;
       }
 
@@ -1775,7 +1775,7 @@ export default function CustomizerPage() {
         clearActiveProductState();
       }
     } catch {
-      setError("Lỗi kết nối server");
+      setError("Server connection error");
     } finally {
       setCleaningOld(false);
     }
@@ -1784,7 +1784,7 @@ export default function CustomizerPage() {
   const handleDeleteProduct = async (productId) => {
     const pid = String(productId || "");
     if (!pid || deletingProductId) return;
-    const ok = window.confirm(`Xóa product này?\n${pid}`);
+    const ok = window.confirm(`Delete this product?\n${pid}`);
     if (!ok) return;
 
     setDeletingProductId(pid);
@@ -1794,7 +1794,7 @@ export default function CustomizerPage() {
       const res = await fetch(`/api/products/${encodeURIComponent(pid)}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok || !data?.success) {
-        setError(data?.error || "Không thể xóa product");
+        setError(data?.error || "Unable to delete product");
         return;
       }
       const nextProducts = data.products || [];
@@ -1803,7 +1803,7 @@ export default function CustomizerPage() {
         clearActiveProductState();
       }
     } catch {
-      setError("Lỗi kết nối server");
+      setError("Server connection error");
     } finally {
       setDeletingProductId(null);
     }
@@ -1820,7 +1820,7 @@ export default function CustomizerPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
-        setError(data?.error || "Không thể lưu Draft");
+        setError(data?.error || "Unable to save draft");
         return;
       }
       if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
@@ -1828,7 +1828,7 @@ export default function CustomizerPage() {
       }
       await refreshProducts();
     } catch {
-      setError("Lỗi kết nối server");
+      setError("Server connection error");
     } finally {
       setSavingDraft(false);
     }
@@ -1845,17 +1845,17 @@ export default function CustomizerPage() {
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
-        setError(data?.error || "Không thể publish product");
+        setError(data?.error || "Unable to publish product");
         return;
       }
       if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
         setNotice(data.warnings.join(" | "));
       } else {
-        setNotice("Publish thành công sang Online Store channel.");
+        setNotice("Published successfully to Online Store channel.");
       }
       await refreshProducts();
     } catch {
-      setError("Lỗi kết nối server");
+      setError("Server connection error");
     } finally {
       setPublishingProduct(false);
     }
@@ -1888,17 +1888,17 @@ export default function CustomizerPage() {
           <div className="import-card">
             <h2>🧩 Import Product / Collection</h2>
             <p className="subtitle">
-              Dán link product hoặc collection. Hệ thống sẽ tự nhận dạng và cho phép import hàng loạt.
+              Paste a product or collection link. The system will auto-detect and support bulk import.
             </p>
             {storeInfo?.configured ? (
               <div className="store-badge" style={{ marginBottom: 10 }}>
-                <span className="dot"></span> Kết nối: {storeInfo.store}
+                <span className="dot"></span> Connected: {storeInfo.store}
               </div>
             ) : (
               <div className="config-warning" style={{ marginBottom: 10 }}>
                 <span className="config-warning-icon">⚠️</span>
                 <div className="config-warning-text">
-                  Chưa cấu hình Shopify store. Cập nhật <code>.env</code> với <code>SHOPIFY_STORE</code> và <code>SHOPIFY_ACCESS_TOKEN</code>.
+                  Shopify store is not configured. Update <code>.env</code> with <code>SHOPIFY_STORE</code> and <code>SHOPIFY_ACCESS_TOKEN</code>.
                 </div>
               </div>
             )}
@@ -1917,7 +1917,7 @@ export default function CustomizerPage() {
                   setBatchProgress(null);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && !inspectingLink && handleInspectImportUrl()}
-                placeholder="https://macorner.co/products/... hoặc /collections/..."
+                placeholder="https://macorner.co/products/... or /collections/..."
                 disabled={inspectingLink || importing || batchImporting || (storeInfo && !storeInfo.configured)}
               />
               <button
@@ -1931,7 +1931,7 @@ export default function CustomizerPage() {
             </div>
 
             <div className="import-type-hint">
-              Nhận dạng:{" "}
+              Detected:{" "}
               <strong>
                 {importLinkTypeHint === "product"
                   ? "Product"
@@ -1948,7 +1948,7 @@ export default function CustomizerPage() {
                 type="text"
                 value={importVendor}
                 onChange={(e) => setImportVendor(e.target.value)}
-                placeholder="Ví dụ: Alienscustom"
+                placeholder="Example: Alienscustom"
                 disabled={inspectingLink || importing || batchImporting}
               />
             </div>
@@ -1960,7 +1960,7 @@ export default function CustomizerPage() {
                 type="text"
                 value={importCategory}
                 onChange={(e) => setImportCategory(e.target.value)}
-                placeholder="Ví dụ: Acrylic Plaque"
+                placeholder="Example: Acrylic Plaque"
                 disabled={inspectingLink || importing || batchImporting}
               />
             </div>
@@ -1972,7 +1972,7 @@ export default function CustomizerPage() {
                 onChange={(e) => setImportPublish(Boolean(e.target.checked))}
                 disabled={importing || batchImporting}
               />
-              <span>Public ngay khi import</span>
+              <span>Publish during import</span>
             </label>
 
             {importTarget?.type === "product" && (
@@ -1989,7 +1989,7 @@ export default function CustomizerPage() {
                   onClick={handleImportResolvedProduct}
                   disabled={importing || batchImporting}
                 >
-                  {importing ? "Đang import..." : importPublish ? "Import + Public" : "Import + Draft"}
+                  {importing ? "Importing..." : importPublish ? "Import + Publish" : "Import + Draft"}
                 </button>
               </div>
             )}
@@ -2110,7 +2110,7 @@ export default function CustomizerPage() {
                     );
                   })}
                   {filteredCollectionProducts.length === 0 ? (
-                    <div className="collection-products-empty">Không có product nào theo filter hiện tại.</div>
+                    <div className="collection-products-empty">No products for the current filter.</div>
                   ) : null}
                 </div>
               </div>
@@ -2147,7 +2147,7 @@ export default function CustomizerPage() {
               onClick={handleCleanupOld}
               disabled={products.length <= 1 || cleaningOld}
             >
-              {cleaningOld ? "Đang xóa..." : "🗑️ Xóa personalized cũ"}
+              {cleaningOld ? "Deleting..." : "🗑️ Delete old personalized data"}
             </button>
           </div>
           <div className="products-grid">
@@ -2166,7 +2166,7 @@ export default function CustomizerPage() {
                     handleDeleteProduct(p.id);
                   }}
                   disabled={Boolean(deletingProductId) || cleaningOld}
-                  title="Xóa product"
+                  title="Delete product"
                   aria-label={`Delete ${p.id}`}
                 >
                   {deletingProductId === p.id ? "…" : "×"}
@@ -2185,7 +2185,7 @@ export default function CustomizerPage() {
 
       {!isEmbedded && adminView === "products" && products.length === 0 && (
         <div className="empty-products">
-          Chưa có product nào được import. Chuyển qua tab <strong>Import</strong> để thêm mới.
+          No products imported yet. Go to the <strong>Import</strong> tab to add one.
         </div>
       )}
 
@@ -2220,7 +2220,7 @@ export default function CustomizerPage() {
                 onClick={handleSaveDraft}
                 disabled={savingDraft || publishingProduct || deletingProductId === activeProductRecord.id}
               >
-                {savingDraft ? "Đang lưu..." : "Save Draft"}
+                {savingDraft ? "Saving..." : "Save Draft"}
               </button>
               <button
                 className="btn btn-success btn-sm"
@@ -2232,7 +2232,7 @@ export default function CustomizerPage() {
                   String(activeProductRecord?.shopifyClone?.status || "").toLowerCase() === "active"
                 }
               >
-                {publishingProduct ? "Đang publish..." : "Public Product"}
+                {publishingProduct ? "Publishing..." : "Publish Product"}
               </button>
               {activeProductRecord?.shopifyClone?.productUrl ? (
                 <a
@@ -2241,7 +2241,7 @@ export default function CustomizerPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Mở Shopify Admin
+                  Open Shopify Admin
                 </a>
               ) : null}
             </div>
@@ -2290,7 +2290,7 @@ export default function CustomizerPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Mở trang gốc
+                  Open source page
                 </a>
               ) : null}
             </div>
@@ -2380,7 +2380,7 @@ export default function CustomizerPage() {
               />
               {previewLoading && (
                 <div className="preview-loading">
-                  <span className="spinner"></span> Đang render...
+                  <span className="spinner"></span> Rendering...
                 </div>
               )}
               {hasFocusedUpload && focusedUploadFrameStyle && (
@@ -2424,7 +2424,7 @@ export default function CustomizerPage() {
                     onPointerMove={handleRotateHandlePointerMove}
                     onPointerUp={handleRotateHandlePointerEnd}
                     onPointerCancel={handleRotateHandlePointerEnd}
-                    title="Xoay ảnh"
+                    title="Rotate image"
                     aria-label="Rotate image"
                   >
                     ↻
