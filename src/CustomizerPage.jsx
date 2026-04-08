@@ -754,11 +754,11 @@ export default function CustomizerPage() {
   useEffect(() => {
     if (!isEmbedded || typeof window === "undefined") return undefined;
     const notifyParent = () => {
-      const h = Math.max(
+      const contentHeight = Math.max(
         document.documentElement?.scrollHeight || 0,
-        document.body?.scrollHeight || 0,
-        500
+        document.body?.scrollHeight || 0
       );
+      const h = contentHeight > 0 ? contentHeight : 1;
       window.parent?.postMessage(
         {
           type: "product-cloner:embedded-resize",

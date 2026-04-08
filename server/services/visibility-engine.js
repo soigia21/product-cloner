@@ -243,13 +243,19 @@ export function isOptionVisible(optionCid, allOptions, currentSelections, memo =
     const watchOpt = map[watchCid];
     const desired = normalizeDesiredValue(cond.desired_value).map(String);
     const action = String(cond.action || "show").toLowerCase();
+    const selectedRaw = currentSelections?.[watchCid];
+    const selectedValueCid =
+      selectedRaw === undefined || selectedRaw === null ? "" : String(selectedRaw);
+    const hasWatcherSelection = selectedValueCid !== "";
+    // Customily uses desired_value = -1 as "watcher has any selected value".
+    const match = desired.includes("-1")
+      ? hasWatcherSelection
+      : desired.some((v) => v === selectedValueCid);
 
     // Some Customily exports use set-scoped pseudo watchers (not present in options[]).
     // If caller injected a synthetic selection for that watcher, evaluate directly.
     if (!watchOpt) {
-      const selectedValueCid = String(currentSelections?.[watchCid] || "");
-      if (!selectedValueCid) return false;
-      const match = desired.some((v) => v === selectedValueCid);
+      if (!hasWatcherSelection) return false;
       return action === "hide" ? !match : match;
     }
 
@@ -258,8 +264,6 @@ export function isOptionVisible(optionCid, allOptions, currentSelections, memo =
       return false;
     }
 
-    const selectedValueCid = String(currentSelections[watchCid] || "");
-    const match = desired.some((v) => v === selectedValueCid);
     return action === "hide" ? !match : match;
   };
 
