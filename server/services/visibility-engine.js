@@ -532,7 +532,8 @@ export function computeVisibility(allOptions, currentSelections, config = {}) {
 
       // If hidden, remove stale selection so it won't leak into later cascade checks.
       if (!visible) {
-        if (selections[cid] !== undefined) {
+        const keepUserSelectionWhileHidden = userSelectedSet ? userSelectedSet.has(cid) : false;
+        if (!keepUserSelectionWhileHidden && selections[cid] !== undefined) {
           delete selections[cid];
           delete selectionMeta[cid];
           changed = true;
@@ -660,6 +661,9 @@ function collectImageSelectionCandidates(value) {
   const out = [];
   pushUniqueCandidate(out, value.image_id);
   pushUniqueCandidate(out, value.color_id);
+  if (out.length > 0) {
+    return out;
+  }
 
   const sortId = Number(value.sort_id);
   if (Number.isFinite(sortId)) {

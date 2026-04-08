@@ -406,31 +406,71 @@ async function extractPageInfo(productUrl) {
   return result;
 }
 
+export async function fetchLibraryDIPByPositions(libraryId, positions = []) {
+  const normalized = [...new Set((positions || [])
+    .map((raw) => Number(raw))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => Math.trunc(n))
+  )].sort((a, b) => a - b);
+  if (normalized.length === 0) return [];
+
+  const results = await Promise.all(
+    normalized.map((pos) =>
+      fetchJSON(`${APP_BASE}/api/Libraries/${libraryId}/Elements/Position/${pos}`)
+        .then((data) => (data && data.ImageId ? [pos, data.Path] : null))
+        .catch(() => null)
+    )
+  );
+  return results.filter(Boolean).sort((a, b) => a[0] - b[0]);
+}
+
+export function accumulateLibraryDipScanState(
+  state = { hasSeenEntries: false, consecutiveEmptyBatches: 0 },
+  batchResults = [],
+  maxConsecutiveEmptyBatches = 2
+) {
+  const safeState = state || { hasSeenEntries: false, consecutiveEmptyBatches: 0 };
+  const hasEntriesInBatch = (batchResults || []).some(Boolean);
+  const hasSeenEntries = Boolean(safeState.hasSeenEntries) || hasEntriesInBatch;
+  const consecutiveEmptyBatches = hasEntriesInBatch
+    ? 0
+    : Number(safeState.consecutiveEmptyBatches || 0) + 1;
+  const done = hasSeenEntries && consecutiveEmptyBatches >= maxConsecutiveEmptyBatches;
+
+  return {
+    hasSeenEntries,
+    consecutiveEmptyBatches,
+    done,
+  };
+}
+
 /**
  * Fetch Library DIP entries for a holder — PARALLEL batches
  * Per Blueprint §2.3
  */
-async function fetchLibraryDIP(libraryId, maxPositions = 500) {
+async function fetchLibraryDIP(libraryId, maxPositions = 500, minScanUntil = 0) {
   const BATCH_SIZE = 30; // concurrent requests per batch
   const entries = [];
-  let done = false;
+  let state = { hasSeenEntries: false, consecutiveEmptyBatches: 0, done: false };
+  const minRequiredPosition = Math.max(0, Number(minScanUntil) || 0);
 
-  for (let batchStart = 1; batchStart <= maxPositions && !done; batchStart += BATCH_SIZE) {
+  for (let batchStart = 1; batchStart <= maxPositions; batchStart += BATCH_SIZE) {
     const batchEnd = Math.min(batchStart + BATCH_SIZE - 1, maxPositions);
-    const promises = [];
-
+    const positions = [];
     for (let pos = batchStart; pos <= batchEnd; pos++) {
-      promises.push(
-        fetchJSON(`${APP_BASE}/api/Libraries/${libraryId}/Elements/Position/${pos}`)
-          .then((data) => (data && data.ImageId ? { pos, path: data.Path } : null))
-          .catch(() => null)
-      );
+      positions.push(pos);
     }
 
-    const results = await Promise.all(promises);
-    for (const r of results) {
-      if (r) entries.push([r.pos, r.path]);
-      else { done = true; } // Stop when we hit an empty position
+    const batchEntries = await fetchLibraryDIPByPositions(libraryId, positions);
+    const byPos = new Map(batchEntries.map(([pos, pathValue]) => [pos, pathValue]));
+    for (const pos of positions) {
+      const hitPath = byPos.get(pos);
+      if (hitPath) entries.push([pos, hitPath]);
+    }
+    const batchResults = positions.map((pos) => byPos.has(pos));
+    state = accumulateLibraryDipScanState(state, batchResults);
+    if (state.done && batchEnd >= minRequiredPosition) {
+      break;
     }
   }
 
@@ -453,6 +493,45 @@ function parseDIP(dipString) {
     }
     return entries;
   }
+}
+
+function collectRequiredLibraryMaxKeys(options = [], designs = {}) {
+  const holderToLibraryId = new Map();
+  for (const design of Object.values(designs || {})) {
+    for (const holder of design?.preview?.imagePlaceHoldersPreview || []) {
+      if (!holder?.imageLibraryId) continue;
+      holderToLibraryId.set(String(holder.id), String(holder.imageLibraryId));
+    }
+  }
+
+  const libraryMaxById = new Map();
+  for (const opt of options || []) {
+    const holders = (opt?.functions || [])
+      .filter((fn) => fn?.type === "image" && fn?.image_id !== undefined && fn?.image_id !== null && String(fn.image_id) !== "")
+      .map((fn) => String(fn.image_id));
+    if (holders.length === 0) continue;
+
+    let maxRequiredKey = 0;
+    for (const value of opt?.values || []) {
+      for (const rawKey of [value?.image_id, value?.color_id]) {
+        const numKey = Number(rawKey);
+        if (!Number.isFinite(numKey) || numKey <= 0) continue;
+        if (numKey > maxRequiredKey) maxRequiredKey = Math.trunc(numKey);
+      }
+    }
+    if (maxRequiredKey <= 0) continue;
+
+    for (const holderId of holders) {
+      const libraryId = holderToLibraryId.get(String(holderId));
+      if (!libraryId) continue;
+      const prev = Number(libraryMaxById.get(libraryId) || 0);
+      if (maxRequiredKey > prev) {
+        libraryMaxById.set(libraryId, maxRequiredKey);
+      }
+    }
+  }
+
+  return Object.fromEntries(libraryMaxById.entries());
 }
 
 function getVariationValueFromVariant(variant, position) {
@@ -719,6 +798,7 @@ export async function importProduct(productUrl) {
   console.log("\n📚 Step 5: Checking hair libraries...");
   const libraryDIPs = {};
   const librariesToFetch = new Set();
+  const requiredLibraryMaxKeys = collectRequiredLibraryMaxKeys(allOptions, designs);
 
   for (const design of Object.values(designs)) {
     for (const holder of design.preview?.imagePlaceHoldersPreview || []) {
@@ -741,7 +821,9 @@ export async function importProduct(productUrl) {
     console.log(`   ⚡ Fetching ${librariesToFetch.size} libraries in parallel...`);
     const libResults = await Promise.all(
       [...librariesToFetch].map(async (libId) => {
-        const entries = await fetchLibraryDIP(libId);
+        const requiredMax = Number(requiredLibraryMaxKeys[String(libId)] || 0);
+        const maxPositions = Math.max(500, requiredMax + 60);
+        const entries = await fetchLibraryDIP(libId, maxPositions, requiredMax);
         console.log(`   ✅ Library ${libId}: ${entries.length} entries`);
         return [libId, entries];
       })

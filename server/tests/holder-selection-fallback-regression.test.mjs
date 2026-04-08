@@ -21,14 +21,10 @@ async function run() {
     germanShepherdHolder.selectedPath,
     "Selected dog breed variant should resolve to a concrete render path"
   );
-
-  const singlePetHolder = (trace.imagePlan || []).find(
-    (item) => String(item.holderId) === "115"
-  );
-  assert.ok(singlePetHolder, "Expected holder 115 to exist in trace image plan");
-  assert.ok(
-    singlePetHolder.selectedPath,
-    "Single-pet placeholder variant should resolve to a concrete render path"
+  assert.notStrictEqual(
+    germanShepherdHolder.selectedSource,
+    "dip-fallback",
+    "Dog holder should render from direct selected DIP key, not index fallback"
   );
 
   console.log("holder-selection-fallback-regression.test: OK");

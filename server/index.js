@@ -1081,14 +1081,16 @@ app.post("/api/products/:id/preview", async (req, res) => {
   const product = loadProduct(req.params.id);
   if (!product) return res.status(404).json({ error: "Product not found" });
 
-  const { selections, textInputs, uploadInputs, uploadTransforms } = req.body;
+  const { selections, textInputs, userSelections, uploadInputs, uploadTransforms } = req.body;
+  const userSelectedOptionIds = userSelections ? Object.keys(userSelections) : [];
   try {
     const pngBuffer = await renderPreview(
       req.params.id,
       selections || {},
       textInputs || {},
       uploadInputs || {},
-      uploadTransforms || {}
+      uploadTransforms || {},
+      { userSelectedOptionIds }
     );
     res.set("Content-Type", "image/png");
     res.send(pngBuffer);

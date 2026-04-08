@@ -404,6 +404,107 @@ function buildBoundImageHolderSet(options = []) {
   return bound;
 }
 
+function normalizeDipKey(rawKey) {
+  const n = Number(rawKey);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return String(Math.trunc(n));
+}
+
+function mergeDipEntries(currentEntries = [], fetchedEntries = []) {
+  const merged = new Map();
+  for (const entry of currentEntries || []) {
+    const key = normalizeDipKey(entry?.[0]);
+    if (!key) continue;
+    merged.set(key, [Number(key), entry[1]]);
+  }
+  for (const entry of fetchedEntries || []) {
+    const key = normalizeDipKey(entry?.[0]);
+    if (!key) continue;
+    merged.set(key, [Number(key), entry[1]]);
+  }
+  return [...merged.values()].sort((a, b) => a[0] - b[0]);
+}
+
+async function fetchLibraryEntriesByPositions(libraryId, positions = []) {
+  const normalized = [...new Set((positions || [])
+    .map((raw) => Number(raw))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => Math.trunc(n))
+  )].sort((a, b) => a - b);
+  if (normalized.length === 0) return [];
+
+  const results = await Promise.all(
+    normalized.map((pos) =>
+      fetchJSON(`${APP_BASE}/api/Libraries/${libraryId}/Elements/Position/${pos}`)
+        .then((data) => (data && data.ImageId ? [pos, data.Path] : null))
+        .catch(() => null)
+    )
+  );
+  return results.filter(Boolean);
+}
+
+async function hydrateMissingLibraryDipEntries(
+  product,
+  imageHolders = [],
+  holderSelections = {},
+  holderSelectionCandidates = {}
+) {
+  const missingByLibrary = new Map();
+  const holdersByLibrary = new Map();
+
+  for (const holder of imageHolders || []) {
+    const libraryId = String(holder?.imageLibraryId || "").trim();
+    if (!libraryId) continue;
+    const holderId = String(holder.id);
+
+    const keys = [];
+    const selectedKey = normalizeDipKey(holderSelections?.[holderId]);
+    if (selectedKey) keys.push(selectedKey);
+    for (const rawCandidate of holderSelectionCandidates?.[holderId] || []) {
+      const candidate = normalizeDipKey(rawCandidate);
+      if (!candidate) continue;
+      if (!keys.includes(candidate)) keys.push(candidate);
+    }
+    if (keys.length === 0) continue;
+
+    const existing = new Set((holder._dip || [])
+      .map((entry) => normalizeDipKey(entry?.[0]))
+      .filter(Boolean)
+    );
+
+    for (const key of keys) {
+      if (existing.has(key)) continue;
+      if (!missingByLibrary.has(libraryId)) {
+        missingByLibrary.set(libraryId, new Set());
+      }
+      missingByLibrary.get(libraryId).add(Number(key));
+    }
+
+    if (!holdersByLibrary.has(libraryId)) {
+      holdersByLibrary.set(libraryId, []);
+    }
+    holdersByLibrary.get(libraryId).push(holder);
+  }
+
+  if (missingByLibrary.size === 0) return;
+
+  const fetchedByLibrary = await Promise.all(
+    [...missingByLibrary.entries()].map(async ([libraryId, positionsSet]) => {
+      const fetched = await fetchLibraryEntriesByPositions(libraryId, [...positionsSet]);
+      return [libraryId, fetched];
+    })
+  );
+
+  for (const [libraryId, fetched] of fetchedByLibrary) {
+    if (!fetched || fetched.length === 0) continue;
+    for (const holder of holdersByLibrary.get(libraryId) || []) {
+      holder._dip = mergeDipEntries(holder._dip || [], fetched);
+    }
+    if (!product.libraryDIPs) product.libraryDIPs = {};
+    product.libraryDIPs[libraryId] = mergeDipEntries(product.libraryDIPs[libraryId] || [], fetched);
+  }
+}
+
 function resolveSelectedImagePath(
   holder,
   holderSelections,
@@ -528,7 +629,8 @@ export async function renderPreview(
   selections = {},
   textInputs = {},
   uploadInputs = {},
-  uploadTransforms = {}
+  uploadTransforms = {},
+  config = {}
 ) {
   const product = loadProduct(productId);
   if (!product) throw new Error(`Product not found: ${productId}`);
@@ -536,6 +638,7 @@ export async function renderPreview(
   const synthetic = deriveSyntheticSelectionsFromProductConfig(product.productConfig || {});
   // Resolve visibility/defaults first so design UUID follows the same finalized selections.
   const { visibleOptions, selections: finalSelections } = computeVisibility(product.options, selections, {
+    userSelectedOptionIds: config?.userSelectedOptionIds || null,
     syntheticSelections: synthetic.selections,
     syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
   });
@@ -597,6 +700,12 @@ export async function renderPreview(
       holder._dip = product.libraryDIPs[holder.imageLibraryId];
     }
   }
+  await hydrateMissingLibraryDipEntries(
+    product,
+    imageHolders,
+    holderSelections,
+    holderSelectionCandidates
+  );
 
   const boundHolderIds = buildBoundImageHolderSet(product.options || []);
 
@@ -807,6 +916,12 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
       holder._dip = product.libraryDIPs[holder.imageLibraryId];
     }
   }
+  await hydrateMissingLibraryDipEntries(
+    product,
+    imageHolders,
+    holderSelections,
+    holderSelectionCandidates
+  );
 
   const boundHolderIds = buildBoundImageHolderSet(product.options || []);
 
