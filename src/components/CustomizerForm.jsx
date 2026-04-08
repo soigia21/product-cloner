@@ -51,13 +51,7 @@ function isCheckboxOption(option) {
   return t === "checkbox";
 }
 
-function isBinaryCheckboxOption(option) {
-  if (!isCheckboxOption(option)) return false;
-  const values = Array.isArray(option?.values) ? option.values : [];
-  return values.length <= 2;
-}
-
-function getBinaryCheckboxValueIds(option) {
+function getCheckboxValueIds(option) {
   const values = [...(option?.values || [])].sort(compareBySortIdThenId);
   const falseValue = values.find((v) => String(v?.id) === "0") || values[0] || null;
   const trueFromOptionValue = values.find(
@@ -77,10 +71,9 @@ function getBinaryCheckboxValueIds(option) {
 
 function isCheckboxChecked(option, raw) {
   const v = String(raw ?? "");
-  if (!isBinaryCheckboxOption(option)) return false;
-  const { trueValueId } = getBinaryCheckboxValueIds(option);
-  if (v === trueValueId) return true;
-  return v !== "" && v !== "0" && v.toLowerCase() !== "false";
+  const { trueValueId } = getCheckboxValueIds(option);
+  if (!trueValueId) return false;
+  return v === trueValueId;
 }
 
 function resolveUploadValueUrl(uploadValue) {
@@ -349,7 +342,6 @@ export default function CustomizerForm({
         const isEditing = String(focusedUploadOptionId || "") === cid;
         const uploading = Boolean(uploadingUploadOptionIds?.[cid]);
         const required = isRequiredOption(opt);
-        const checkboxBinary = isBinaryCheckboxOption(opt);
 
         return (
           <div
@@ -361,7 +353,7 @@ export default function CustomizerForm({
               {required ? <span className="required-marker">*</span> : null}
             </label>
 
-            {(opt.type === "Swatch" || (isCheckboxOption(opt) && !checkboxBinary)) && (
+            {opt.type === "Swatch" && (
               <SwatchOption
                 option={opt}
                 selectedValue={selectedValue}
@@ -385,7 +377,7 @@ export default function CustomizerForm({
               />
             )}
 
-            {isCheckboxOption(opt) && checkboxBinary && (
+            {isCheckboxOption(opt) && (
               <CheckboxOption
                 option={opt}
                 selectedValue={selectedValue}
@@ -393,8 +385,8 @@ export default function CustomizerForm({
                   onSelectionChange(
                     String(opt.id),
                     nextChecked
-                      ? getBinaryCheckboxValueIds(opt).trueValueId
-                      : getBinaryCheckboxValueIds(opt).falseValueId
+                      ? getCheckboxValueIds(opt).trueValueId
+                      : getCheckboxValueIds(opt).falseValueId
                   )
                 }
               />

@@ -5,7 +5,7 @@ function makeBinaryCheckboxOption() {
   return {
     id: 55,
     type: "Checkbox",
-    optionValue: 2,
+    optionValue: 1,
     functions: [{ type: "image", image_id: "200" }],
     values: [
       { id: 0, image_id: "1", sort_id: 1, value: "Off" },
@@ -51,8 +51,8 @@ function run() {
   const checked = mapSelectionsToHolders(visibleOptions, { "55": "1", "10": "0" }, {}, {});
   assert.strictEqual(
     checked.holderSelections["200"],
-    "2",
-    "Checked binary checkbox should map from optionValue override"
+    "9",
+    "Checked checkbox should map to optionValue-selected image"
   );
 
   console.log("✅ render-binding-regression.test passed");
@@ -64,4 +64,3 @@ try {
   console.error(error);
   process.exit(1);
 }
-

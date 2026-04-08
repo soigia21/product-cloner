@@ -20,18 +20,25 @@ function run() {
   const option = makeDogsLikeMultiStateCheckbox();
   const visibleOptions = [option];
 
-  const sel1 = mapSelectionsToHolders(visibleOptions, { "768": "1" }, {}, {});
+  const unchecked = mapSelectionsToHolders(visibleOptions, { "768": "0" }, {}, {});
   assert.strictEqual(
-    sel1.holderSelections["18"],
-    "602",
-    "Multi-state checkbox must map using selected value.image_id"
+    unchecked.holderSelections["18"],
+    "601",
+    "Unchecked checkbox must map to default (false) value image"
   );
 
-  const sel2 = mapSelectionsToHolders(visibleOptions, { "768": "2" }, {}, {});
+  const checked = mapSelectionsToHolders(visibleOptions, { "768": "2" }, {}, {});
   assert.strictEqual(
-    sel2.holderSelections["18"],
+    checked.holderSelections["18"],
     "603",
-    "Multi-state checkbox must keep per-value mapping for image holder"
+    "Checked checkbox must map using optionValue target image"
+  );
+
+  const legacyWrongValue = mapSelectionsToHolders(visibleOptions, { "768": "1" }, {}, {});
+  assert.strictEqual(
+    legacyWrongValue.holderSelections["18"],
+    "601",
+    "Non-checked value ids must resolve to unchecked image for checkbox semantics"
   );
 
   console.log("✅ visibility-dogs-variants-regression.test passed");
@@ -43,4 +50,3 @@ try {
   console.error(error);
   process.exit(1);
 }
-
