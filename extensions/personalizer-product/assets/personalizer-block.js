@@ -435,8 +435,10 @@
       iframe.loading = "lazy";
       iframe.referrerPolicy = "strict-origin-when-cross-origin";
       iframe.allow = "clipboard-read; clipboard-write";
+      iframe.setAttribute("scrolling", "no");
       iframe.src = embedUrl.toString();
       iframe.style.height = `${DEFAULT_HEIGHT}px`;
+      iframe.style.overflow = "hidden";
       shell.appendChild(iframe);
       root.appendChild(shell);
 

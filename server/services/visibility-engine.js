@@ -624,6 +624,11 @@ function isCheckboxOption(opt) {
   return t === "checkbox";
 }
 
+function isTruthyCheckboxSelection(rawSelected) {
+  const selected = String(rawSelected ?? "");
+  return selected !== "" && selected !== "0" && selected.toLowerCase() !== "false";
+}
+
 function resolveCheckboxImageSelection(opt, selectedValueCid = "") {
   const values = [...(opt?.values || [])].sort(compareBySortIdThenId);
   if (values.length === 0) return { key: null, candidates: [] };
@@ -639,12 +644,25 @@ function resolveCheckboxImageSelection(opt, selectedValueCid = "") {
     falseValue;
 
   const selected = String(selectedValueCid || "");
-  const checked = selected !== "" && selected === String(trueValue?.id ?? "");
-  const active = checked ? trueValue : falseValue;
-  const candidates = collectImageSelectionCandidates(active);
+  const checked = isTruthyCheckboxSelection(selected) || selected === String(trueValue?.id ?? "");
+
+  if (checked) {
+    const candidates = [];
+    // For Customily checkbox options, optionValue is the authoritative DIP key when checked.
+    pushUniqueCandidate(candidates, opt?.optionValue);
+    for (const candidate of collectImageSelectionCandidates(trueValue)) {
+      pushUniqueCandidate(candidates, candidate);
+    }
+    return {
+      key: candidates[0] || null,
+      candidates,
+    };
+  }
+
+  const falseCandidates = collectImageSelectionCandidates(falseValue);
   return {
-    key: candidates[0] || null,
-    candidates,
+    key: falseCandidates[0] || null,
+    candidates: falseCandidates,
   };
 }
 

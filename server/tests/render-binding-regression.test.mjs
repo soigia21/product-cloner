@@ -51,8 +51,8 @@ function run() {
   const checked = mapSelectionsToHolders(visibleOptions, { "55": "1", "10": "0" }, {}, {});
   assert.strictEqual(
     checked.holderSelections["200"],
-    "9",
-    "Checked checkbox should map to optionValue-selected image"
+    "1",
+    "Checked checkbox should map to optionValue DIP key"
   );
 
   console.log("✅ render-binding-regression.test passed");

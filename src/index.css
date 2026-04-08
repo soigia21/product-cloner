@@ -33,6 +33,11 @@ body.pz-embedded-body #root {
   background: transparent !important;
 }
 
+html.pz-embedded-html,
+body.pz-embedded-body {
+  overflow: hidden !important;
+}
+
 * {
   margin: 0;
   padding: 0;

@@ -30,15 +30,15 @@ function run() {
   const checked = mapSelectionsToHolders(visibleOptions, { "768": "2" }, {}, {});
   assert.strictEqual(
     checked.holderSelections["18"],
-    "603",
-    "Checked checkbox must map using optionValue target image"
+    "2",
+    "Checked checkbox must map to optionValue DIP key"
   );
 
   const legacyWrongValue = mapSelectionsToHolders(visibleOptions, { "768": "1" }, {}, {});
   assert.strictEqual(
     legacyWrongValue.holderSelections["18"],
-    "601",
-    "Non-checked value ids must resolve to unchecked image for checkbox semantics"
+    "2",
+    "Legacy truthy checkbox payload must still map to optionValue DIP key"
   );
 
   console.log("✅ visibility-dogs-variants-regression.test passed");

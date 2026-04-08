@@ -8,6 +8,11 @@ body.pz-embedded-body #root {
   background: transparent !important;
 }
 
+html.pz-embedded-html,
+body.pz-embedded-body {
+  overflow: hidden !important;
+}
+
 .customizer-page {
   max-width: 1400px;
   margin: 0 auto;
