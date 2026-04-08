@@ -223,6 +223,7 @@ export async function createProduct(store, accessToken, product, options = {}) {
     options?.defaultInventoryQuantity,
     DEFAULT_IMPORTED_INVENTORY_QUANTITY
   );
+  const resolvedProductType = String(product?.productType || product?.category || "").trim();
   const url = `https://${store}/admin/api/${API_VERSION}/products.json`;
 
   // Build product payload cho REST API
@@ -231,7 +232,7 @@ export async function createProduct(store, accessToken, product, options = {}) {
       title: product.title,
       body_html: product.bodyHtml,
       vendor: product.vendor || undefined,
-      product_type: product.productType || undefined,
+      product_type: resolvedProductType || undefined,
       tags: Array.isArray(product.tags) ? product.tags.join(", ") : product.tags || "",
       status,
       published_scope: status === "active" ? "global" : undefined,

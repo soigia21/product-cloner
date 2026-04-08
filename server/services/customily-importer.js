@@ -18,6 +18,7 @@ import https from "https";
 import { fetchJSON, getFont } from "./image-cache.js";
 
 const DATA_DIR = path.resolve(process.cwd(), "data");
+const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 const APP_BASE = "https://app.customily.com";
 const SH_BASE = "https://sh.customily.com";
 
@@ -48,6 +49,20 @@ function buildImportedProductId(handle, shopifyProductId) {
   const safePid = String(shopifyProductId || "").replace(/[^0-9]/g, "");
   if (safePid) return `${safeHandle}-${safePid}`;
   return safeHandle;
+}
+
+function sanitizeUploadSegment(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function removeDirIfExists(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return false;
+  fs.rmSync(dirPath, { recursive: true, force: true });
+  return true;
 }
 
 function compareBySortIdThenId(a, b) {
@@ -862,13 +877,28 @@ export function updateProductMetadata(productId, patch = {}) {
 }
 
 /**
- * Delete one imported product by ID (remove data/products/{id})
+ * Delete one imported product by ID.
+ * Remove full personalized footprint:
+ * - data/products/{id}
+ * - data/uploads/{id} (user uploaded images for Image Upload options)
  */
 export function deleteProduct(productId) {
-  const productDir = path.join(DATA_DIR, "products", productId);
-  if (!fs.existsSync(productDir)) return false;
-  fs.rmSync(productDir, { recursive: true, force: true });
-  return true;
+  const rawId = String(productId || "");
+  const safeUploadId = sanitizeUploadSegment(rawId);
+
+  const productDir = path.join(DATA_DIR, "products", rawId);
+  const uploadDirs = [
+    path.join(UPLOADS_DIR, rawId),
+    path.join(UPLOADS_DIR, safeUploadId),
+  ];
+
+  let removedAny = false;
+  removedAny = removeDirIfExists(productDir) || removedAny;
+  for (const dir of uploadDirs) {
+    removedAny = removeDirIfExists(dir) || removedAny;
+  }
+
+  return removedAny;
 }
 
 /**
@@ -883,9 +913,32 @@ export function cleanupOldProducts(keepLatest = 1) {
     deleteProduct(id);
   }
 
+  const keptIds = products.slice(0, keep).map((p) => String(p.id || ""));
+  const allowedUploadDirs = new Set(
+    keptIds.flatMap((id) => {
+      const safe = sanitizeUploadSegment(id);
+      return safe && safe !== id ? [id, safe] : [id];
+    }).filter(Boolean)
+  );
+  const removedOrphanUploadDirs = [];
+  if (fs.existsSync(UPLOADS_DIR)) {
+    const entries = fs.readdirSync(UPLOADS_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry?.isDirectory?.()) continue;
+      const dirName = String(entry.name || "");
+      if (!dirName || allowedUploadDirs.has(dirName)) continue;
+      const fullPath = path.join(UPLOADS_DIR, dirName);
+      if (removeDirIfExists(fullPath)) {
+        removedOrphanUploadDirs.push(dirName);
+      }
+    }
+  }
+
   return {
     removedCount: toDelete.length,
     removedIds: toDelete,
+    removedOrphanUploadCount: removedOrphanUploadDirs.length,
+    removedOrphanUploadDirs,
     keptCount: Math.min(keep, products.length),
   };
 }

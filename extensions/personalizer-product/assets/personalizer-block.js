@@ -14,6 +14,7 @@
   const iframeByWindow = new Map();
   let mountObserver = null;
   let mountDebounceTimer = null;
+  let globalStyleMounted = false;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -44,6 +45,130 @@
 
   function getRootSection(root) {
     return root?.closest(".shopify-section, section") || null;
+  }
+
+  function ensureGlobalStyle() {
+    if (globalStyleMounted) return;
+    const id = "pz-theme-block-global-style";
+    if (document.getElementById(id)) {
+      globalStyleMounted = true;
+      return;
+    }
+    const style = document.createElement("style");
+    style.id = id;
+    style.textContent = "[data-pz-hidden-single-option='1']{display:none !important;}";
+    document.head.appendChild(style);
+    globalStyleMounted = true;
+  }
+
+  function isVariantOptionControlName(name) {
+    const key = String(name || "").trim().toLowerCase();
+    if (!key) return false;
+    return (
+      key.startsWith("options[") ||
+      key === "option1" ||
+      key === "option2" ||
+      key === "option3"
+    );
+  }
+
+  function findOptionWrapper(el) {
+    if (!el) return null;
+    return (
+      el.closest(
+        "[data-option-index], [data-option-position], [data-product-option], .product-form__input, .selector-wrapper, .variant-input-wrap, .product-option, fieldset"
+      ) ||
+      el.parentElement ||
+      null
+    );
+  }
+
+  function setOptionWrapperHidden(wrapper, hidden) {
+    if (!wrapper) return;
+    if (hidden) {
+      wrapper.setAttribute("data-pz-hidden-single-option", "1");
+      return;
+    }
+    wrapper.removeAttribute("data-pz-hidden-single-option");
+  }
+
+  function distinctSelectValues(select) {
+    const values = new Set();
+    for (const option of Array.from(select?.options || [])) {
+      if (!option) continue;
+      if (option.disabled) continue;
+      const val = String(option.value || "").trim();
+      if (!val) continue;
+      values.add(val);
+    }
+    return values;
+  }
+
+  function hideSingleValueVariantOptions(root) {
+    const section = getRootSection(root) || document;
+    if (!section) return;
+    ensureGlobalStyle();
+
+    const touched = new Set();
+
+    const selects = section.querySelectorAll("select[name], select[data-option-index], select[data-option-position]");
+    for (const select of selects) {
+      if (!(select instanceof HTMLSelectElement)) continue;
+      if (!isVariantOptionControlName(select.name) && !select.hasAttribute("data-option-index") && !select.hasAttribute("data-option-position")) {
+        continue;
+      }
+      const wrapper = findOptionWrapper(select);
+      if (!wrapper) continue;
+      touched.add(wrapper);
+      const count = distinctSelectValues(select).size;
+      setOptionWrapperHidden(wrapper, count <= 1);
+    }
+
+    const optionInputs = Array.from(section.querySelectorAll("input[type='radio'][name], input[type='checkbox'][name]"))
+      .filter((input) => isVariantOptionControlName(input.name));
+    const grouped = new Map();
+    for (const input of optionInputs) {
+      const key = String(input.name || "");
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(input);
+    }
+    for (const inputs of grouped.values()) {
+      if (!inputs || inputs.length === 0) continue;
+      const wrapper = findOptionWrapper(inputs[0]);
+      if (!wrapper) continue;
+      touched.add(wrapper);
+      const values = new Set();
+      for (const input of inputs) {
+        if (!(input instanceof HTMLInputElement)) continue;
+        if (input.disabled) continue;
+        const val = String(input.value || "").trim();
+        if (!val) continue;
+        values.add(val);
+      }
+      setOptionWrapperHidden(wrapper, values.size <= 1);
+    }
+
+    const containerCandidates = section.querySelectorAll(
+      "[data-option-index], [data-option-position], [data-product-option], .product-form__input, .selector-wrapper, .variant-input-wrap, fieldset"
+    );
+    for (const container of containerCandidates) {
+      if (!(container instanceof HTMLElement)) continue;
+      if (touched.has(container)) continue;
+      const buttons = container.querySelectorAll("[data-option-value], [data-value]");
+      if (!buttons || buttons.length === 0) continue;
+      const values = new Set();
+      for (const btn of buttons) {
+        const val = String(
+          btn.getAttribute("data-option-value") ||
+          btn.getAttribute("data-value") ||
+          ""
+        ).trim();
+        if (!val) continue;
+        values.add(val);
+      }
+      if (values.size === 0) continue;
+      setOptionWrapperHidden(container, values.size <= 1);
+    }
   }
 
   function setImageSource(img, previewUrl) {
@@ -198,11 +323,13 @@
     if (!observeRoot) return;
 
     const observer = new MutationObserver(() => {
-      if (!linked.pendingPreviewUrl) return;
       if (linked.observerDebounceTimer) clearTimeout(linked.observerDebounceTimer);
       linked.observerDebounceTimer = setTimeout(() => {
         linked.observerDebounceTimer = null;
-        tryApplyPendingPreview(linked);
+        hideSingleValueVariantOptions(linked.root);
+        if (linked.pendingPreviewUrl) {
+          tryApplyPendingPreview(linked);
+        }
       }, MEDIA_MUTATION_DEBOUNCE_MS);
     });
 
@@ -314,9 +441,11 @@
       root.appendChild(shell);
 
       bindIframeResize(iframe, embedUrl.origin, root);
+      hideSingleValueVariantOptions(root);
 
       iframe.addEventListener("load", () => {
         bindIframeResize(iframe, embedUrl.origin, root);
+        hideSingleValueVariantOptions(root);
         setDebug(root, {
           src: iframe.src,
           templateId: root.dataset.templateId || "",
@@ -331,6 +460,7 @@
   }
 
   function mountAll() {
+    ensureGlobalStyle();
     const roots = document.querySelectorAll("[data-personalizer-block]");
     for (const root of roots) {
       mountRoot(root);

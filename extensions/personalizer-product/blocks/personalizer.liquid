@@ -17,23 +17,29 @@
 
 <style>
   .pz-theme-block {
+    --pz-bg: #f7f3ee;
+    --pz-surface: #ffffff;
+    --pz-border: #e0d8cc;
+    --pz-text: #1a1a1a;
     width: 100%;
-    margin: 0 0 12px 0;
+    margin: 0 0 24px 0;
     padding: 0;
     border: 0;
     background: transparent;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--pz-text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   }
   .pz-debug {
-    margin-top: 10px;
-    font-size: 12px;
+    margin-top: 12px;
+    font-size: 13px;
     line-height: 1.5;
-    color: #475467;
+    color: #555;
     white-space: pre-wrap;
     word-break: break-word;
-    background: #f8fafc;
-    border-radius: 8px;
-    padding: 10px;
+    background: var(--pz-surface);
+    border: 1.5px solid var(--pz-border);
+    border-radius: 16px;
+    padding: 12px;
   }
   .pz-embed-shell {
     width: 100%;
@@ -49,6 +55,12 @@
     border: 0;
     display: block;
     background: transparent;
+  }
+
+  @media (max-width: 767px) {
+    .pz-theme-block {
+      margin-bottom: 20px;
+    }
   }
 </style>
 

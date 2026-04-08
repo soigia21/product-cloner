@@ -116,6 +116,8 @@ function buildCloneSourceFromScraped(scrapedProduct = {}, sourceUrl = "") {
     title: scrapedProduct?.title || "",
     price: firstVariant?.price || "",
     compareAtPrice: firstVariant?.compareAtPrice || null,
+    productType: scrapedProduct?.productType || "",
+    category: scrapedProduct?.category || scrapedProduct?.productType || "",
     variantsCount: Array.isArray(scrapedProduct?.variants) ? scrapedProduct.variants.length : 0,
     image: firstImage?.src || "",
     sourceUrl: sourceUrl || "",
@@ -128,6 +130,7 @@ function buildClonedProductSnapshot(scrapedProduct = {}, sourceUrl = "") {
     bodyHtml: scrapedProduct?.bodyHtml || "",
     vendor: scrapedProduct?.vendor || "",
     productType: scrapedProduct?.productType || "",
+    category: scrapedProduct?.category || scrapedProduct?.productType || "",
     tags: Array.isArray(scrapedProduct?.tags) ? scrapedProduct.tags : [],
     options: Array.isArray(scrapedProduct?.options)
       ? scrapedProduct.options.map((opt) => ({
@@ -460,7 +463,7 @@ app.use("/proxy/:id/*", proxyOriginalPage);
  * POST /api/import — Import a Customily product
  */
 app.post("/api/import", async (req, res) => {
-  const { url, publish, vendor } = req.body;
+  const { url, publish, vendor, category } = req.body;
   if (!url) return res.status(400).json({ error: "Thiếu URL sản phẩm" });
   const cfg = getShopifyConfig();
   if (!cfg.configured) {
@@ -534,14 +537,20 @@ app.post("/api/import", async (req, res) => {
     currentStep = "scrape_source_product";
     scrapedProduct = await retryImportStep("scrapeProduct", () => scrapeProduct(url));
     const vendorOverride = String(vendor || "").trim();
+    const categoryOverride = String(category || "").trim();
     const effectiveProduct = vendorOverride
       ? { ...scrapedProduct, vendor: vendorOverride }
-      : scrapedProduct;
+      : { ...scrapedProduct };
+    if (categoryOverride) {
+      effectiveProduct.productType = categoryOverride;
+      effectiveProduct.category = categoryOverride;
+    }
 
     patchImportStatus(importedProduct.id, {
       state: "creating_shopify_clone",
       currentStep,
       vendorOverride: vendorOverride || "",
+      categoryOverride: categoryOverride || "",
       publishRequested: Boolean(publish),
     });
 

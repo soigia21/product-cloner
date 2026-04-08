@@ -103,9 +103,11 @@ export default function CustomizerPage() {
   const [importTarget, setImportTarget] = useState(null);
   const [collectionChecks, setCollectionChecks] = useState({});
   const [collectionImportResults, setCollectionImportResults] = useState({});
+  const [collectionResultFilter, setCollectionResultFilter] = useState("all");
   const [batchProgress, setBatchProgress] = useState(null);
   const [importPublish, setImportPublish] = useState(false);
   const [importVendor, setImportVendor] = useState("");
+  const [importCategory, setImportCategory] = useState("");
   const [adminView, setAdminView] = useState("import");
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishingProduct, setPublishingProduct] = useState(false);
@@ -189,15 +191,41 @@ export default function CustomizerPage() {
     () => (importTarget?.type === "collection" ? (importTarget.products || []) : []),
     [importTarget]
   );
+  const filteredCollectionProducts = useMemo(() => {
+    const mode = String(collectionResultFilter || "all");
+    if (mode === "all") return collectionProducts;
+    if (mode === "success") {
+      return collectionProducts.filter((p) => String(collectionImportResults[String(p?.url || "")]?.status || "") === "success");
+    }
+    if (mode === "failed") {
+      return collectionProducts.filter((p) => String(collectionImportResults[String(p?.url || "")]?.status || "") === "failed");
+    }
+    return collectionProducts;
+  }, [collectionProducts, collectionImportResults, collectionResultFilter]);
+  const collectionResultStats = useMemo(() => {
+    let success = 0;
+    let failed = 0;
+    for (const product of collectionProducts) {
+      const url = String(product?.url || "");
+      const status = String(collectionImportResults[url]?.status || "");
+      if (status === "success") success += 1;
+      if (status === "failed") failed += 1;
+    }
+    return {
+      all: collectionProducts.length,
+      success,
+      failed,
+    };
+  }, [collectionProducts, collectionImportResults]);
   const selectedCollectionCount = useMemo(() => {
-    if (!Array.isArray(collectionProducts) || collectionProducts.length === 0) return 0;
+    if (!Array.isArray(filteredCollectionProducts) || filteredCollectionProducts.length === 0) return 0;
     let count = 0;
-    for (const p of collectionProducts) {
+    for (const p of filteredCollectionProducts) {
       const url = String(p?.url || "");
       if (url && collectionChecks[url]) count += 1;
     }
     return count;
-  }, [collectionChecks, collectionProducts]);
+  }, [collectionChecks, filteredCollectionProducts]);
 
   const uploadHolderByOptionId = useMemo(() => {
     const map = {};
@@ -766,6 +794,7 @@ export default function CustomizerPage() {
         setImportTarget(null);
         setCollectionChecks({});
         setCollectionImportResults({});
+        setCollectionResultFilter("all");
         setError(data?.error || "Không thể phân tích link import");
         return;
       }
@@ -782,14 +811,17 @@ export default function CustomizerPage() {
         }
         setCollectionChecks(nextChecks);
         setCollectionImportResults(nextResults);
+        setCollectionResultFilter("all");
       } else {
         setCollectionChecks({});
         setCollectionImportResults({});
+        setCollectionResultFilter("all");
       }
     } catch {
       setImportTarget(null);
       setCollectionChecks({});
       setCollectionImportResults({});
+      setCollectionResultFilter("all");
       setError("Lỗi kết nối server");
     } finally {
       setInspectingLink(false);
@@ -807,6 +839,7 @@ export default function CustomizerPage() {
         url,
         publish: Boolean(importPublish),
         vendor: String(importVendor || "").trim(),
+        category: String(importCategory || "").trim(),
       }),
     });
     const data = await res.json();
@@ -846,13 +879,21 @@ export default function CustomizerPage() {
   };
 
   const handleToggleAllCollection = (checked) => {
-    const next = {};
-    for (const product of collectionProducts) {
-      const url = String(product?.url || "");
-      if (!url) continue;
-      next[url] = Boolean(checked);
-    }
-    setCollectionChecks(next);
+    setCollectionChecks((prev) => {
+      const next = { ...prev };
+      for (const product of filteredCollectionProducts) {
+        const url = String(product?.url || "");
+        if (!url) continue;
+        next[url] = Boolean(checked);
+      }
+      return next;
+    });
+  };
+
+  const handleSetCollectionResultFilter = (mode) => {
+    const nextMode = String(mode || "all");
+    if (!["all", "success", "failed"].includes(nextMode)) return;
+    setCollectionResultFilter(nextMode);
   };
 
   const handleCollectionCheck = (url, checked) => {
@@ -866,7 +907,7 @@ export default function CustomizerPage() {
 
   const handleImportCollectionSelected = async () => {
     if (batchImporting) return;
-    const selected = collectionProducts.filter((p) => collectionChecks[String(p?.url || "")]);
+    const selected = filteredCollectionProducts.filter((p) => collectionChecks[String(p?.url || "")]);
     if (selected.length === 0) {
       setError("Chưa chọn product nào để import");
       return;
@@ -1772,6 +1813,7 @@ export default function CustomizerPage() {
                   setImportTarget(null);
                   setCollectionChecks({});
                   setCollectionImportResults({});
+                  setCollectionResultFilter("all");
                   setBatchProgress(null);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && !inspectingLink && handleInspectImportUrl()}
@@ -1807,6 +1849,18 @@ export default function CustomizerPage() {
                 value={importVendor}
                 onChange={(e) => setImportVendor(e.target.value)}
                 placeholder="Ví dụ: Alienscustom"
+                disabled={inspectingLink || importing || batchImporting}
+              />
+            </div>
+
+            <div className="import-vendor-row">
+              <label htmlFor="import-category-input">Category / Product type (optional override)</label>
+              <input
+                id="import-category-input"
+                type="text"
+                value={importCategory}
+                onChange={(e) => setImportCategory(e.target.value)}
+                placeholder="Ví dụ: Acrylic Plaque"
                 disabled={inspectingLink || importing || batchImporting}
               />
             </div>
@@ -1847,8 +1901,36 @@ export default function CustomizerPage() {
                     <strong>Collection:</strong> {importTarget?.collection?.handle}
                   </div>
                   <div>
-                    {selectedCollectionCount}/{collectionProducts.length} selected
+                    {selectedCollectionCount}/{filteredCollectionProducts.length} selected
+                    {collectionResultFilter !== "all" ? ` (filter/${collectionProducts.length})` : ""}
                   </div>
+                </div>
+
+                <div className="collection-result-filters" role="tablist" aria-label="Filter import result">
+                  <button
+                    type="button"
+                    className={`btn btn-ghost btn-sm ${collectionResultFilter === "all" ? "active" : ""}`}
+                    onClick={() => handleSetCollectionResultFilter("all")}
+                    disabled={batchImporting}
+                  >
+                    All ({collectionResultStats.all})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-ghost btn-sm ${collectionResultFilter === "success" ? "active" : ""}`}
+                    onClick={() => handleSetCollectionResultFilter("success")}
+                    disabled={batchImporting}
+                  >
+                    Success ({collectionResultStats.success})
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-ghost btn-sm ${collectionResultFilter === "failed" ? "active" : ""}`}
+                    onClick={() => handleSetCollectionResultFilter("failed")}
+                    disabled={batchImporting}
+                  >
+                    Fail ({collectionResultStats.failed})
+                  </button>
                 </div>
 
                 <div className="collection-import-actions">
@@ -1891,7 +1973,7 @@ export default function CustomizerPage() {
                 )}
 
                 <div className="collection-products-list">
-                  {collectionProducts.map((product) => {
+                  {filteredCollectionProducts.map((product) => {
                     const url = String(product?.url || "");
                     const checked = Boolean(collectionChecks[url]);
                     const rowResult = collectionImportResults[url] || { status: "idle", message: "" };
@@ -1927,6 +2009,9 @@ export default function CustomizerPage() {
                       </label>
                     );
                   })}
+                  {filteredCollectionProducts.length === 0 ? (
+                    <div className="collection-products-empty">Không có product nào theo filter hiện tại.</div>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -2024,6 +2109,7 @@ export default function CustomizerPage() {
 
             <div className="clone-summary-meta">
               <span>💵 {activeProductRecord?.cloneSource?.price || "-"}</span>
+              <span>🏷️ {activeProductRecord?.cloneSource?.category || activeProductRecord?.cloneSource?.productType || "-"}</span>
               <span>🎭 {activeProductRecord?.cloneSource?.variantsCount || activeProductRecord?.variantsCount || 0} variants</span>
               <span>🆔 {activeProductRecord?.shopifyClone?.productId || "-"}</span>
             </div>
@@ -2118,7 +2204,7 @@ export default function CustomizerPage() {
 
             <div className="product-detail-meta">
               <span>Vendor: {activeClonedProduct.vendor || "-"}</span>
-              <span>Type: {activeClonedProduct.productType || "-"}</span>
+              <span>Category: {activeClonedProduct.category || activeClonedProduct.productType || "-"}</span>
               <span>Variants: {activeClonedVariants.length}</span>
               <span>Images: {activeClonedImages.length}</span>
             </div>
