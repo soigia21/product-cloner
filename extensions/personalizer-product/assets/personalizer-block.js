@@ -489,7 +489,7 @@
     const bar = ensureMainEditBar(linked);
     if (!bar) return;
 
-    const editable = Boolean(linked.editState?.editable) && Boolean(linked.uploadFocused);
+    const editable = Boolean(linked.editState?.editable);
     if (!editable) {
       bar.setAttribute("hidden", "hidden");
       return;
@@ -498,6 +498,9 @@
 
     const hostInfo = resolveMainImageHost(linked.root);
     let host = hostInfo?.host || null;
+    if (!host && linked.previewCanvasHost && linked.previewCanvasHost.isConnected) {
+      host = linked.previewCanvasHost;
+    }
     if (!host && linked.editBarHost && linked.editBarHost.isConnected) {
       host = linked.editBarHost;
     }
