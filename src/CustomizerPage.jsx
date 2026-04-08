@@ -464,7 +464,8 @@ export default function CustomizerPage() {
       const height = Number(canvas.height) || 0;
       if (width <= 0 || height <= 0) return;
 
-      const MAX_EDGE = 960;
+      const dpr = Math.max(1, Math.min(Number(window.devicePixelRatio) || 1, 2));
+      const MAX_EDGE = Math.max(1400, Math.round(1200 * dpr));
       let source = canvas;
       if (Math.max(width, height) > MAX_EDGE) {
         const ratio = MAX_EDGE / Math.max(width, height);
@@ -480,7 +481,7 @@ export default function CustomizerPage() {
         }
       }
 
-      const previewUrl = source.toDataURL("image/jpeg", 0.88);
+      const previewUrl = source.toDataURL("image/jpeg", 0.94);
       window.parent.postMessage(
         {
           type: "product-cloner:preview-updated",

@@ -72,10 +72,18 @@
   }
   .pz-main-preview-canvas {
     position: absolute;
-    z-index: 70;
+    z-index: 5;
     pointer-events: none;
     background: transparent;
     display: block;
+  }
+  .product-thumbnails,
+  .product__media-thumbnails,
+  .thumbnail-list,
+  .product-gallery__thumbnails,
+  [data-product-thumbnails] {
+    position: relative;
+    z-index: 12;
   }
   .pz-main-edit-bar[hidden] {
     display: none !important;
@@ -85,7 +93,7 @@
     left: 50%;
     bottom: 12px;
     transform: translateX(-50%);
-    z-index: 90;
+    z-index: 20;
     display: flex;
     flex-direction: column;
     gap: 6px;

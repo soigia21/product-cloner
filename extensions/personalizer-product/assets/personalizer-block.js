@@ -232,6 +232,9 @@
     const drawWidth = Math.max(1, Math.round(imageRect.width));
     const drawHeight = Math.max(1, Math.round(imageRect.height));
     if (drawWidth <= 1 || drawHeight <= 1) return false;
+    const dpr = Math.max(1, Math.min(Number(window.devicePixelRatio) || 1, 2.5));
+    const bitmapWidth = Math.max(1, Math.round(drawWidth * dpr));
+    const bitmapHeight = Math.max(1, Math.round(drawHeight * dpr));
 
     const left = Math.max(0, imageRect.left - hostRect.left);
     const top = Math.max(0, imageRect.top - hostRect.top);
@@ -240,9 +243,10 @@
     canvas.style.top = `${top}px`;
     canvas.style.width = `${drawWidth}px`;
     canvas.style.height = `${drawHeight}px`;
+    canvas.dataset.pzDpr = String(dpr);
 
-    if (canvas.width !== drawWidth) canvas.width = drawWidth;
-    if (canvas.height !== drawHeight) canvas.height = drawHeight;
+    if (canvas.width !== bitmapWidth) canvas.width = bitmapWidth;
+    if (canvas.height !== bitmapHeight) canvas.height = bitmapHeight;
     return true;
   }
 
@@ -260,7 +264,10 @@
       const w = Number(canvas.width) || 0;
       const h = Number(canvas.height) || 0;
       if (w <= 0 || h <= 0) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, w, h);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, w, h);
       canvas.removeAttribute("hidden");
     };
@@ -453,7 +460,7 @@
       const image = targets[0];
       const host =
         image.closest(
-          "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery, media-gallery"
+          "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id]"
         ) ||
         image.parentElement ||
         null;
@@ -469,7 +476,7 @@
     if (!(fallback instanceof HTMLImageElement)) return null;
     const fallbackHost =
       fallback.closest(
-        "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery, media-gallery"
+        "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id]"
       ) ||
       fallback.parentElement ||
       null;
