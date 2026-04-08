@@ -92,6 +92,53 @@ export function deriveSyntheticSelectionsFromProductConfig(productConfig = {}) {
   };
 }
 
+function deriveImplicitMissingWatcherSelections(allOptions = [], preselected = {}) {
+  const optionIds = new Set((allOptions || []).map((opt) => String(opt?.id)));
+  const protectedWatcherIds = new Set(Object.keys(preselected || {}).map(String));
+  const candidateValueByWatcher = new Map();
+  const ambiguousWatchers = new Set();
+
+  for (const opt of allOptions || []) {
+    for (const cond of opt?.conditions || []) {
+      const watchCid = String(cond?.watch_option || "");
+      if (!watchCid || optionIds.has(watchCid) || protectedWatcherIds.has(watchCid)) continue;
+
+      const action = String(cond?.action || "show").toLowerCase();
+      const desired = normalizeDesiredValue(cond?.desired_value).map(String);
+
+      // Only infer stable pseudo-watchers when condition shape is deterministic.
+      if (action !== "show" || desired.length !== 1) {
+        ambiguousWatchers.add(watchCid);
+        continue;
+      }
+
+      const inferredValue = desired[0];
+      // Keep fallback conservative to prevent broad accidental branches.
+      if (inferredValue !== "0" && inferredValue !== "-1") {
+        ambiguousWatchers.add(watchCid);
+        continue;
+      }
+
+      if (!candidateValueByWatcher.has(watchCid)) {
+        candidateValueByWatcher.set(watchCid, inferredValue);
+        continue;
+      }
+
+      if (candidateValueByWatcher.get(watchCid) !== inferredValue) {
+        ambiguousWatchers.add(watchCid);
+      }
+    }
+  }
+
+  const inferredSelections = {};
+  for (const [watchCid, inferredValue] of candidateValueByWatcher.entries()) {
+    if (ambiguousWatchers.has(watchCid)) continue;
+    inferredSelections[watchCid] = inferredValue;
+  }
+
+  return inferredSelections;
+}
+
 function isProductOption(opt) {
   return (opt.functions || []).some((fn) => fn.type === "product");
 }
@@ -290,11 +337,22 @@ export function isOptionVisible(optionCid, allOptions, currentSelections, memo =
  */
 export function computeVisibility(allOptions, currentSelections, config = {}) {
   const orderedOptions = [...allOptions].sort(compareBySortIdThenId);
-  const syntheticSelections = Object.fromEntries(
+  const configuredSyntheticSelections = Object.fromEntries(
     Object.entries(config?.syntheticSelections || {}).map(([k, v]) => [String(k), String(v)])
   );
+  const inferredMissingWatcherSelections = deriveImplicitMissingWatcherSelections(
+    orderedOptions,
+    { ...configuredSyntheticSelections, ...(currentSelections || {}) }
+  );
+  const syntheticSelections = {
+    ...configuredSyntheticSelections,
+    ...inferredMissingWatcherSelections,
+  };
   const syntheticAnchoredSet = new Set(
-    Array.from(config?.syntheticAnchoredOptionIds || []).map(String)
+    [
+      ...Array.from(config?.syntheticAnchoredOptionIds || []).map(String),
+      ...Object.keys(inferredMissingWatcherSelections),
+    ]
   );
   const selections = { ...syntheticSelections, ...(currentSelections || {}) };
   const userSelectedSet = config?.userSelectedOptionIds
