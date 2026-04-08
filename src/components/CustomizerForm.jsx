@@ -275,6 +275,7 @@ function ImageUploadOption({
 export default function CustomizerForm({
   options,
   visibleOptionIds,
+  uiForceShowOptionIds = [],
   selections,
   textInputs,
   uploadInputs,
@@ -291,14 +292,23 @@ export default function CustomizerForm({
     () => new Set(visibleOptionIds.map(String)),
     [visibleOptionIds]
   );
+  const forceShowSet = useMemo(
+    () => new Set((uiForceShowOptionIds || []).map(String)),
+    [uiForceShowOptionIds]
+  );
 
   // Filter visible options and keep deterministic Customily order (sort_id)
   const visibleOptions = useMemo(
     () =>
       options
-        .filter((o) => visibleSet.has(String(o.id)) && !o.hide_visually)
+        .filter((o) => {
+          const oid = String(o.id);
+          if (!visibleSet.has(oid)) return false;
+          if (!o.hide_visually) return true;
+          return forceShowSet.has(oid);
+        })
         .sort(compareBySortIdThenId),
-    [options, visibleSet]
+    [options, visibleSet, forceShowSet]
   );
 
   return (

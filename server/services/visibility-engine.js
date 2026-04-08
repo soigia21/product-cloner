@@ -255,6 +255,149 @@ function shouldAutoDefault(
   return true;
 }
 
+function sortedObjectEntries(input = {}) {
+  return Object.entries(input || {})
+    .map(([k, v]) => [String(k), String(v)])
+    .sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function collectSelectedProductDesignKeys(visibleOptions = [], selections = {}) {
+  const rows = [];
+  for (const opt of visibleOptions || []) {
+    if (!isProductOption(opt)) continue;
+    const cid = String(opt.id);
+    const selectedCid = String(selections[cid] ?? "");
+    if (!selectedCid) continue;
+    const selectedValue = (opt.values || []).find((v) => String(v.id) === selectedCid);
+    const productId = String(selectedValue?.product_id || "").trim();
+    if (!productId) continue;
+    rows.push(`${cid}:${productId}`);
+  }
+  rows.sort();
+  return rows;
+}
+
+function buildImpactSignature(visibleOptions = [], selections = {}, textInputs = {}, uploadInputs = {}) {
+  const visibleOptionIds = (visibleOptions || [])
+    .map((o) => String(o.id))
+    .sort((a, b) => a.localeCompare(b));
+  const { holderSelections, textMappings, uploadMappings } = mapSelectionsToHolders(
+    visibleOptions,
+    selections,
+    textInputs,
+    uploadInputs
+  );
+  const selectedProductDesignKeys = collectSelectedProductDesignKeys(visibleOptions, selections);
+  return JSON.stringify({
+    visibleOptionIds,
+    holderSelections: sortedObjectEntries(holderSelections),
+    textMappings: sortedObjectEntries(textMappings),
+    uploadMappings: sortedObjectEntries(uploadMappings),
+    selectedProductDesignKeys,
+  });
+}
+
+function collectCandidateValueIdsForImpact(option, allOptions = [], currentValueCid = "") {
+  const values = [...(option?.values || [])].sort(compareBySortIdThenId);
+  const valueIdSet = new Set(values.map((v) => String(v.id)));
+  const out = new Set();
+
+  const current = String(currentValueCid || "");
+  if (current && valueIdSet.has(current)) out.add(current);
+
+  const watcherId = String(option?.id || "");
+  for (const dep of allOptions || []) {
+    for (const cond of dep?.conditions || []) {
+      if (String(cond?.watch_option || "") !== watcherId) continue;
+      for (const rawDesired of normalizeDesiredValue(cond?.desired_value)) {
+        const desired = String(rawDesired);
+        if (valueIdSet.has(desired)) out.add(desired);
+      }
+    }
+  }
+
+  if (out.size === 0) {
+    for (const v of values.slice(0, 2)) out.add(String(v.id));
+  } else if (out.size === 1 && values.length > 1) {
+    const firstDifferent = values.find((v) => !out.has(String(v.id)));
+    if (firstDifferent) out.add(String(firstDifferent.id));
+  }
+
+  return [...out];
+}
+
+/**
+ * Determine hidden options that should be shown in UI because changing their value
+ * changes downstream visibility/render behavior.
+ */
+export function computeUiForceShowOptionIds(allOptions, currentSelections = {}, config = {}) {
+  const orderedOptions = [...(allOptions || [])].sort(compareBySortIdThenId);
+  if (orderedOptions.length === 0) return [];
+
+  const baseResult = computeVisibility(orderedOptions, currentSelections, config);
+  const baseVisibleOptions = baseResult.visibleOptions || [];
+  const baseSelections = baseResult.selections || {};
+  const textInputs = config?.textInputs || {};
+  const uploadInputs = config?.uploadInputs || {};
+  const baseSignature = buildImpactSignature(
+    baseVisibleOptions,
+    baseSelections,
+    textInputs,
+    uploadInputs
+  );
+
+  const baseUserSelectedOptionIds = config?.userSelectedOptionIds
+    ? Array.from(config.userSelectedOptionIds).map(String)
+    : null;
+
+  const candidates = baseVisibleOptions.filter(
+    (opt) =>
+      Boolean(opt?.hide_visually) &&
+      Array.isArray(opt?.values) &&
+      opt.values.length > 1
+  );
+  if (candidates.length === 0) return [];
+
+  const forceShow = [];
+  for (const opt of candidates) {
+    const cid = String(opt.id);
+    const current = String(baseSelections[cid] ?? "");
+    const candidateValueIds = collectCandidateValueIdsForImpact(opt, orderedOptions, current);
+    let impactful = false;
+
+    for (const nextValueCid of candidateValueIds) {
+      const nextCid = String(nextValueCid || "");
+      if (!nextCid || nextCid === current) continue;
+
+      const mutatedSelections = { ...baseSelections, [cid]: nextCid };
+      const mutatedUserSelectedOptionIds = baseUserSelectedOptionIds
+        ? [...new Set([...baseUserSelectedOptionIds, cid])]
+        : config?.userSelectedOptionIds;
+
+      const mutatedResult = computeVisibility(orderedOptions, mutatedSelections, {
+        ...config,
+        userSelectedOptionIds: mutatedUserSelectedOptionIds,
+      });
+      const mutatedSignature = buildImpactSignature(
+        mutatedResult.visibleOptions || [],
+        mutatedResult.selections || {},
+        textInputs,
+        uploadInputs
+      );
+      if (mutatedSignature !== baseSignature) {
+        impactful = true;
+        break;
+      }
+    }
+
+    if (impactful) {
+      forceShow.push(cid);
+    }
+  }
+
+  return forceShow;
+}
+
 /**
  * Check if an option is visible given current selections
  * @param {number|string} optionCid - option CID to check

@@ -13,6 +13,7 @@ import crypto from "crypto";
 import { getImage, fetchJSON } from "./image-cache.js";
 import {
   computeVisibility,
+  computeUiForceShowOptionIds,
   mapSelectionsToHolders,
   deriveSyntheticSelectionsFromProductConfig,
 } from "./visibility-engine.js";
@@ -746,6 +747,13 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
     syntheticSelections: synthetic.selections,
     syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
   });
+  const uiForceShowOptionIds = computeUiForceShowOptionIds(product.options, finalSelections, {
+    ...config,
+    syntheticSelections: synthetic.selections,
+    syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
+    textInputs,
+    uploadInputs: config?.uploadInputs || {},
+  });
   const designUUID = resolveDesignUUID(productId, product, finalSelections, visibleOptions);
   if (!designUUID) throw new Error("No design UUID found");
 
@@ -849,6 +857,7 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
       imagePath: preview?.imagePath || null,
     },
     visibleOptionIds: visibleOptions.map((o) => String(o.id)),
+    uiForceShowOptionIds: uiForceShowOptionIds.map((id) => String(id)),
     finalSelections,
     holderSelections,
     uploadMappings,

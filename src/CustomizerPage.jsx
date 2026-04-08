@@ -142,6 +142,7 @@ export default function CustomizerPage() {
   // Customizer state
   const [options, setOptions] = useState([]);
   const [visibleOptionIds, setVisibleOptionIds] = useState([]);
+  const [uiForceShowOptionIds, setUiForceShowOptionIds] = useState([]);
   const [selections, setSelections] = useState({});
   const [userSelections, setUserSelections] = useState({});
   const [textInputs, setTextInputs] = useState({});
@@ -1070,6 +1071,7 @@ export default function CustomizerPage() {
         setActiveImageIndex(0);
         setOptions(data.options);
         setVisibleOptionIds(data.visibleOptionIds);
+        setUiForceShowOptionIds(data.uiForceShowOptionIds || []);
         setSelections(data.defaultSelections || {});
         setUserSelections({});
         setTextInputs({});
@@ -1140,6 +1142,7 @@ export default function CustomizerPage() {
             latestTraceRef.current = data.trace;
             if (applyTraceToForm) {
               setVisibleOptionIds(data.trace.visibleOptionIds || []);
+              setUiForceShowOptionIds(data.trace.uiForceShowOptionIds || []);
               setSelections(data.trace.finalSelections || sels || {});
             }
             await drawTraceToCanvas(data.trace, reqId);
@@ -1175,6 +1178,7 @@ export default function CustomizerPage() {
     setActiveImageIndex(0);
     setOptions([]);
     setVisibleOptionIds([]);
+    setUiForceShowOptionIds([]);
     setSelections({});
     setUserSelections({});
     setTextInputs({});
@@ -2390,6 +2394,7 @@ export default function CustomizerPage() {
           <CustomizerForm
             options={options}
             visibleOptionIds={visibleOptionIds}
+            uiForceShowOptionIds={uiForceShowOptionIds}
             selections={selections}
             textInputs={textInputs}
             uploadInputs={uploadInputs}

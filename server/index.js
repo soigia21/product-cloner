@@ -17,7 +17,11 @@ import {
   deleteProduct,
 } from "./services/customily-importer.js";
 import { renderPreview, preRegisterAllFonts, getWorkflowTrace } from "./services/preview-renderer.js";
-import { computeVisibility, deriveSyntheticSelectionsFromProductConfig } from "./services/visibility-engine.js";
+import {
+  computeVisibility,
+  computeUiForceShowOptionIds,
+  deriveSyntheticSelectionsFromProductConfig,
+} from "./services/visibility-engine.js";
 import { getImage } from "./services/image-cache.js";
 import { getShopifyConfig, getToken } from "./services/shopify-auth.js";
 import https from "https";
@@ -934,11 +938,17 @@ app.get("/api/products/:id/options", (req, res) => {
     syntheticSelections: synthetic.selections,
     syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
   });
+  const uiForceShowOptionIds = computeUiForceShowOptionIds(product.options, selections, {
+    userSelectedOptionIds: [],
+    syntheticSelections: synthetic.selections,
+    syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
+  });
 
   res.json({
     success: true,
     options: product.options,
     visibleOptionIds: visibleOptions.map((o) => o.id),
+    uiForceShowOptionIds,
     defaultSelections: selections,
     variantDesigns: product.variantDesigns,
     productId: product.id,
@@ -953,7 +963,7 @@ app.post("/api/products/:id/visibility", (req, res) => {
   const product = loadProduct(req.params.id);
   if (!product) return res.status(404).json({ error: "Product not found" });
 
-  const { selections, userSelections } = req.body;
+  const { selections, userSelections, textInputs, uploadInputs } = req.body;
   const synthetic = deriveSyntheticSelectionsFromProductConfig(product.productConfig || {});
   const userSelectedOptionIds = userSelections
     ? Object.keys(userSelections)
@@ -967,10 +977,18 @@ app.post("/api/products/:id/visibility", (req, res) => {
       syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
     }
   );
+  const uiForceShowOptionIds = computeUiForceShowOptionIds(product.options, finalSelections, {
+    userSelectedOptionIds,
+    syntheticSelections: synthetic.selections,
+    syntheticAnchoredOptionIds: synthetic.anchoredOptionIds,
+    textInputs: textInputs || {},
+    uploadInputs: uploadInputs || {},
+  });
 
   res.json({
     success: true,
     visibleOptionIds: visibleOptions.map((o) => o.id),
+    uiForceShowOptionIds,
     selections: finalSelections,
   });
 });
