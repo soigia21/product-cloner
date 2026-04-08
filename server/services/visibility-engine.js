@@ -623,6 +623,12 @@ function isCheckboxOption(opt) {
   return t === "checkbox";
 }
 
+function isBinaryCheckboxOption(opt) {
+  if (!isCheckboxOption(opt)) return false;
+  const values = Array.isArray(opt?.values) ? opt.values : [];
+  return values.length <= 2;
+}
+
 function resolveUploadInputPath(uploadInput) {
   if (!uploadInput) return null;
   if (typeof uploadInput === "string") {
@@ -685,18 +691,24 @@ export function mapSelectionsToHolders(
     const textInput = isTextInputOption(opt);
     const imageUploadInput = isImageUploadOption(opt);
     const checkboxInput = isCheckboxOption(opt);
-    const selectedValueCid = String(selections[cid] || "");
+    const selectedRaw = selections[cid];
+    const selectedValueCid =
+      selectedRaw === undefined || selectedRaw === null ? "" : String(selectedRaw);
     if (!selectedValueCid && !textInput && !imageUploadInput) continue;
 
     const selectedValue = opt.values?.find((v) => String(v.id) === selectedValueCid);
     const checkboxChecked =
       checkboxInput &&
+      isBinaryCheckboxOption(opt) &&
       selectedValueCid !== "" &&
       selectedValueCid !== "0" &&
       selectedValueCid.toLowerCase() !== "false";
-    const imageSelectionKey = checkboxChecked
-      ? String(opt.optionValue || "2")
-      : resolveImageSelectionKey(selectedValue);
+    const imageSelectionKey =
+      checkboxInput && isBinaryCheckboxOption(opt)
+        ? checkboxChecked
+          ? String(opt.optionValue || "2")
+          : resolveImageSelectionKey(selectedValue)
+        : resolveImageSelectionKey(selectedValue);
 
     // Image binding: option.functions[].image_id = holder, value.image_id = DIP key
     if (opt.functions && imageSelectionKey) {

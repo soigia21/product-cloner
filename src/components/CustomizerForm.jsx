@@ -51,8 +51,35 @@ function isCheckboxOption(option) {
   return t === "checkbox";
 }
 
-function isCheckboxChecked(raw) {
+function isBinaryCheckboxOption(option) {
+  if (!isCheckboxOption(option)) return false;
+  const values = Array.isArray(option?.values) ? option.values : [];
+  return values.length <= 2;
+}
+
+function getBinaryCheckboxValueIds(option) {
+  const values = [...(option?.values || [])].sort(compareBySortIdThenId);
+  const falseValue = values.find((v) => String(v?.id) === "0") || values[0] || null;
+  const trueFromOptionValue = values.find(
+    (v) => String(v?.id) === String(option?.optionValue ?? "")
+  );
+  const trueValue =
+    trueFromOptionValue ||
+    values.find((v) => String(v?.id) === "1") ||
+    values[1] ||
+    falseValue;
+
+  return {
+    falseValueId: falseValue ? String(falseValue.id) : "",
+    trueValueId: trueValue ? String(trueValue.id) : "1",
+  };
+}
+
+function isCheckboxChecked(option, raw) {
   const v = String(raw ?? "");
+  if (!isBinaryCheckboxOption(option)) return false;
+  const { trueValueId } = getBinaryCheckboxValueIds(option);
+  if (v === trueValueId) return true;
   return v !== "" && v !== "0" && v.toLowerCase() !== "false";
 }
 
@@ -175,10 +202,11 @@ function TextInputOption({ option, value, onChange }) {
   );
 }
 
-function CheckboxOption({ option, checked, onChange }) {
+function CheckboxOption({ option, selectedValue, onChange }) {
   const cid = String(option.id);
   const inputId = `checkbox-input-${cid}`;
   const helpText = option?.help_text || "";
+  const checked = isCheckboxChecked(option, selectedValue);
 
   return (
     <div className="checkbox-option">
@@ -186,7 +214,7 @@ function CheckboxOption({ option, checked, onChange }) {
         <input
           id={inputId}
           type="checkbox"
-          checked={Boolean(checked)}
+          checked={checked}
           onChange={(e) => onChange(Boolean(e.target.checked))}
         />
         {helpText ? <div className="text-input-help">{helpText}</div> : null}
@@ -321,6 +349,7 @@ export default function CustomizerForm({
         const isEditing = String(focusedUploadOptionId || "") === cid;
         const uploading = Boolean(uploadingUploadOptionIds?.[cid]);
         const required = isRequiredOption(opt);
+        const checkboxBinary = isBinaryCheckboxOption(opt);
 
         return (
           <div
@@ -332,7 +361,7 @@ export default function CustomizerForm({
               {required ? <span className="required-marker">*</span> : null}
             </label>
 
-            {opt.type === "Swatch" && (
+            {(opt.type === "Swatch" || (isCheckboxOption(opt) && !checkboxBinary)) && (
               <SwatchOption
                 option={opt}
                 selectedValue={selectedValue}
@@ -356,12 +385,17 @@ export default function CustomizerForm({
               />
             )}
 
-            {isCheckboxOption(opt) && (
+            {isCheckboxOption(opt) && checkboxBinary && (
               <CheckboxOption
                 option={opt}
-                checked={isCheckboxChecked(selectedValue)}
+                selectedValue={selectedValue}
                 onChange={(nextChecked) =>
-                  onSelectionChange(String(opt.id), nextChecked ? "1" : "")
+                  onSelectionChange(
+                    String(opt.id),
+                    nextChecked
+                      ? getBinaryCheckboxValueIds(opt).trueValueId
+                      : getBinaryCheckboxValueIds(opt).falseValueId
+                  )
                 }
               />
             )}

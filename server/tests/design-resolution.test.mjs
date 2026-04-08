@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { getWorkflowTrace } from "../services/preview-renderer.js";
+import { loadProduct } from "../services/customily-importer.js";
 
 const PRODUCT_ID =
   "mother-daughter-best-friends-forever-floral-style-personalized-acrylic-plaque-mo-44630090350748";
 
 async function run() {
+  if (!loadProduct(PRODUCT_ID)) {
+    console.log("design-resolution.test: SKIP (product fixture not found in local data)");
+    return;
+  }
+
   const traceDefault = await getWorkflowTrace(PRODUCT_ID, {}, {}, {});
   assert.equal(
     traceDefault.designUUID,
