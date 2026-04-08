@@ -4,6 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Product Cloner - Shopify</title>
+    <script>
+      (function markEmbeddedModeEarly() {
+        try {
+          var qs = new URLSearchParams(window.location.search || "");
+          var embeddedRaw = String(qs.get("embedded") || "").toLowerCase();
+          var isEmbedded = ["1", "true", "yes", "on"].indexOf(embeddedRaw) >= 0;
+          if (!isEmbedded) return;
+          document.documentElement.classList.add("pz-embedded-html");
+          if (document.body) {
+            document.body.classList.add("pz-embedded-body");
+          } else {
+            document.addEventListener(
+              "DOMContentLoaded",
+              function addEmbeddedBodyClass() {
+                document.body.classList.add("pz-embedded-body");
+              },
+              { once: true }
+            );
+          }
+        } catch (error) {
+          void error;
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />

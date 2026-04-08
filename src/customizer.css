@@ -57,12 +57,14 @@ body.pz-embedded-body #root {
 }
 
 .embedded-loading {
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
-  border-radius: 12px;
-  padding: 14px;
-  color: var(--text-muted, #999);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  background: none !important;
+  color: var(--pz-text-secondary, #555);
   font-size: 14px;
-  text-align: center;
+  text-align: left;
 }
 
 @media (max-width: 1100px) {
@@ -237,12 +239,32 @@ body.pz-embedded-body #root {
 }
 
 .customizer-page.embedded-mode .checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   color: var(--pz-text);
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
 }
 
 .customizer-page.embedded-mode .checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
   accent-color: var(--pz-accent);
+}
+
+.customizer-page.embedded-mode .checkbox-option {
+  display: grid;
+  gap: 8px;
+}
+
+.customizer-page.embedded-mode .checkbox-row-label {
+  display: inline-flex;
+  align-items: center;
 }
 
 .customizer-page.embedded-mode .image-upload-box {

@@ -407,6 +407,7 @@ function buildBoundImageHolderSet(options = []) {
 function resolveSelectedImagePath(
   holder,
   holderSelections,
+  holderSelectionCandidates,
   boundHolderIds,
   uploadMappings = {},
   settings = {}
@@ -426,20 +427,41 @@ function resolveSelectedImagePath(
     };
   }
 
-  const selDipKey = holderSelections[hid];
+  const rawSelectedDipKey = holderSelections[hid];
+  let selDipKey =
+    rawSelectedDipKey !== undefined && rawSelectedDipKey !== null && String(rawSelectedDipKey) !== ""
+      ? String(rawSelectedDipKey)
+      : null;
   let selectedPath = null;
   let selectedSource = null;
+  const dipEntries = holder._dip || [];
+  const candidateKeys = [];
+  if (selDipKey) candidateKeys.push(selDipKey);
+  const extraCandidates = Array.isArray(holderSelectionCandidates?.[hid])
+    ? holderSelectionCandidates[hid]
+    : [];
+  for (const rawCandidate of extraCandidates) {
+    const candidate = String(rawCandidate || "").trim();
+    if (!candidate) continue;
+    if (candidateKeys.includes(candidate)) continue;
+    candidateKeys.push(candidate);
+  }
 
-  if (selDipKey) {
-    const entry = (holder._dip || []).find((e) => parseInt(e[0]) === parseInt(selDipKey));
-    if (entry) {
-      selectedPath = entry[1];
-      selectedSource = "dip";
+  if (candidateKeys.length > 0) {
+    for (let idx = 0; idx < candidateKeys.length; idx++) {
+      const candidate = candidateKeys[idx];
+      const entry = dipEntries.find((e) => parseInt(e[0]) === parseInt(candidate));
+      if (entry) {
+        selectedPath = entry[1];
+        selDipKey = String(entry[0]);
+        selectedSource = idx === 0 ? "dip" : "dip-fallback";
+        break;
+      }
     }
   }
 
-  if (!selectedPath && !boundHolderIds.has(hid) && (holder._dip || []).length > 0) {
-    selectedPath = holder._dip[0]?.[1] || null;
+  if (!selectedPath && !boundHolderIds.has(hid) && dipEntries.length > 0) {
+    selectedPath = dipEntries[0]?.[1] || null;
     if (selectedPath) selectedSource = "fallback";
   }
 
@@ -538,7 +560,7 @@ export async function renderPreview(
     fontFamilyMap[fontPath] = getRenderableFontFamily(localPath);
   }
 
-  const { holderSelections, textMappings, uploadMappings } = mapSelectionsToHolders(
+  const { holderSelections, holderSelectionCandidates, textMappings, uploadMappings } = mapSelectionsToHolders(
     visibleOptions,
     finalSelections,
     textInputs,
@@ -634,6 +656,7 @@ export async function renderPreview(
       const { selectedPath: imgPath, fitMode, selectedSource } = resolveSelectedImagePath(
         holder,
         holderSelections,
+        holderSelectionCandidates,
         boundHolderIds,
         uploadMappings,
         product.settings || {}
@@ -770,7 +793,7 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
   const uploadInputs = config?.uploadInputs || {};
   const uploadTransforms = config?.uploadTransforms || {};
 
-  const { holderSelections, textMappings, uploadMappings } = mapSelectionsToHolders(
+  const { holderSelections, holderSelectionCandidates, textMappings, uploadMappings } = mapSelectionsToHolders(
     visibleOptions,
     finalSelections,
     textInputs,
@@ -792,6 +815,7 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
     const { selDipKey, selectedPath, selectedSource, fitMode } = resolveSelectedImagePath(
       holder,
       holderSelections,
+      holderSelectionCandidates,
       boundHolderIds,
       uploadMappings,
       product.settings || {}

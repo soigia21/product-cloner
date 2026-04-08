@@ -27,6 +27,12 @@
   --radius-lg: 16px;
 }
 
+html.pz-embedded-html,
+body.pz-embedded-body,
+body.pz-embedded-body #root {
+  background: transparent !important;
+}
+
 * {
   margin: 0;
   padding: 0;

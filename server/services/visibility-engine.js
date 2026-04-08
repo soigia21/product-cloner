@@ -623,9 +623,9 @@ function isCheckboxOption(opt) {
   return t === "checkbox";
 }
 
-function resolveCheckboxImageSelectionKey(opt, selectedValueCid = "") {
+function resolveCheckboxImageSelection(opt, selectedValueCid = "") {
   const values = [...(opt?.values || [])].sort(compareBySortIdThenId);
-  if (values.length === 0) return null;
+  if (values.length === 0) return { key: null, candidates: [] };
 
   const falseValue = values.find((v) => String(v?.id) === "0") || values[0] || null;
   const trueFromOptionValue = values.find(
@@ -640,7 +640,47 @@ function resolveCheckboxImageSelectionKey(opt, selectedValueCid = "") {
   const selected = String(selectedValueCid || "");
   const checked = selected !== "" && selected === String(trueValue?.id ?? "");
   const active = checked ? trueValue : falseValue;
-  return resolveImageSelectionKey(active);
+  const candidates = collectImageSelectionCandidates(active);
+  return {
+    key: candidates[0] || null,
+    candidates,
+  };
+}
+
+function pushUniqueCandidate(out, raw) {
+  if (raw === undefined || raw === null) return;
+  const str = String(raw).trim();
+  if (!str) return;
+  if (out.includes(str)) return;
+  out.push(str);
+}
+
+function collectImageSelectionCandidates(value) {
+  if (!value) return [];
+  const out = [];
+  pushUniqueCandidate(out, value.image_id);
+  pushUniqueCandidate(out, value.color_id);
+
+  const sortId = Number(value.sort_id);
+  if (Number.isFinite(sortId)) {
+    const baseSort = Math.trunc(sortId);
+    if (baseSort >= 0) {
+      pushUniqueCandidate(out, baseSort);
+      pushUniqueCandidate(out, baseSort + 1);
+    }
+  }
+
+  const valueId = Number(value.id);
+  if (Number.isFinite(valueId)) {
+    const baseValueId = Math.trunc(valueId);
+    if (baseValueId >= 0) {
+      pushUniqueCandidate(out, baseValueId + 1);
+      pushUniqueCandidate(out, baseValueId + 2);
+      pushUniqueCandidate(out, baseValueId);
+    }
+  }
+
+  return out;
 }
 
 function resolveUploadInputPath(uploadInput) {
@@ -658,22 +698,7 @@ function resolveUploadInputPath(uploadInput) {
 }
 
 function resolveImageSelectionKey(value) {
-  if (!value) return null;
-  const candidates = [value.image_id, value.color_id];
-  for (const c of candidates) {
-    if (c !== undefined && c !== null && String(c) !== "") {
-      return String(c);
-    }
-  }
-  const sortId = Number(value.sort_id);
-  if (Number.isFinite(sortId) && sortId > 0) {
-    return String(Math.trunc(sortId));
-  }
-  const valueId = Number(value.id);
-  if (Number.isFinite(valueId) && valueId >= 0) {
-    return String(Math.trunc(valueId) + 1);
-  }
-  return null;
+  return collectImageSelectionCandidates(value)[0] || null;
 }
 
 /**
@@ -688,7 +713,7 @@ function resolveImageSelectionKey(value) {
  * @param {Object} selections - {optionCid: valueCid}
  * @param {Object} textInputs - {optionCid: "text"}
  * @param {Object} uploadInputs - {optionCid: {url}|"/api/uploads/..."}
- * @returns {{ holderSelections: Object, textMappings: Object, uploadMappings: Object }}
+ * @returns {{ holderSelections: Object, holderSelectionCandidates: Object, textMappings: Object, uploadMappings: Object }}
  */
 export function mapSelectionsToHolders(
   visibleOptions,
@@ -697,6 +722,7 @@ export function mapSelectionsToHolders(
   uploadInputs = {}
 ) {
   const holderSelections = {}; // holderId → DIP key
+  const holderSelectionCandidates = {}; // holderId → ordered DIP key candidates
   const textMappings = {}; // textHolderId → text string
   const uploadMappings = {}; // uploadHolderId → uploaded image path
 
@@ -711,15 +737,23 @@ export function mapSelectionsToHolders(
     if (!selectedValueCid && !textInput && !imageUploadInput && !checkboxInput) continue;
 
     const selectedValue = opt.values?.find((v) => String(v.id) === selectedValueCid);
-    const imageSelectionKey = checkboxInput
-      ? resolveCheckboxImageSelectionKey(opt, selectedValueCid)
+    const checkboxSelection = checkboxInput
+      ? resolveCheckboxImageSelection(opt, selectedValueCid)
+      : null;
+    const imageSelectionCandidates = checkboxSelection
+      ? checkboxSelection.candidates
+      : collectImageSelectionCandidates(selectedValue);
+    const imageSelectionKey = checkboxSelection
+      ? checkboxSelection.key
       : resolveImageSelectionKey(selectedValue);
 
     // Image binding: option.functions[].image_id = holder, value.image_id = DIP key
     if (opt.functions && imageSelectionKey) {
       for (const fn of opt.functions) {
         if (fn.type === "image" && fn.image_id) {
-          holderSelections[String(fn.image_id)] = imageSelectionKey;
+          const holderId = String(fn.image_id);
+          holderSelections[holderId] = imageSelectionKey;
+          holderSelectionCandidates[holderId] = imageSelectionCandidates;
         }
       }
     }
@@ -742,5 +776,5 @@ export function mapSelectionsToHolders(
     }
   }
 
-  return { holderSelections, textMappings, uploadMappings };
+  return { holderSelections, holderSelectionCandidates, textMappings, uploadMappings };
 }

@@ -195,7 +195,7 @@ function TextInputOption({ option, value, onChange }) {
   );
 }
 
-function CheckboxOption({ option, selectedValue, onChange }) {
+function CheckboxOption({ option, selectedValue, onChange, required = false }) {
   const cid = String(option.id);
   const inputId = `checkbox-input-${cid}`;
   const helpText = option?.help_text || "";
@@ -210,9 +210,12 @@ function CheckboxOption({ option, selectedValue, onChange }) {
           checked={checked}
           onChange={(e) => onChange(Boolean(e.target.checked))}
         />
-        {helpText ? <div className="text-input-help">{helpText}</div> : null}
+        <span className="checkbox-row-label">
+          {option?.label}
+          {required ? <span className="required-marker">*</span> : null}
+        </span>
       </label>
-
+      {helpText ? <div className="text-input-help">{helpText}</div> : null}
     </div>
   );
 }
@@ -342,16 +345,19 @@ export default function CustomizerForm({
         const isEditing = String(focusedUploadOptionId || "") === cid;
         const uploading = Boolean(uploadingUploadOptionIds?.[cid]);
         const required = isRequiredOption(opt);
+        const checkboxOption = isCheckboxOption(opt);
 
         return (
           <div
             key={opt.id}
             className="option-group"
           >
-            <label className="option-label">
-              {opt.label}
-              {required ? <span className="required-marker">*</span> : null}
-            </label>
+            {!checkboxOption ? (
+              <label className="option-label">
+                {opt.label}
+                {required ? <span className="required-marker">*</span> : null}
+              </label>
+            ) : null}
 
             {opt.type === "Swatch" && (
               <SwatchOption
@@ -377,10 +383,11 @@ export default function CustomizerForm({
               />
             )}
 
-            {isCheckboxOption(opt) && (
+            {checkboxOption && (
               <CheckboxOption
                 option={opt}
                 selectedValue={selectedValue}
+                required={required}
                 onChange={(nextChecked) =>
                   onSelectionChange(
                     String(opt.id),
