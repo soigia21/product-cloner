@@ -102,6 +102,7 @@ export default function CustomizerPage() {
   const [batchImporting, setBatchImporting] = useState(false);
   const [importTarget, setImportTarget] = useState(null);
   const [collectionChecks, setCollectionChecks] = useState({});
+  const [collectionImportResults, setCollectionImportResults] = useState({});
   const [batchProgress, setBatchProgress] = useState(null);
   const [importPublish, setImportPublish] = useState(false);
   const [importVendor, setImportVendor] = useState("");
@@ -764,6 +765,7 @@ export default function CustomizerPage() {
       if (!res.ok || !data?.success || !data?.target) {
         setImportTarget(null);
         setCollectionChecks({});
+        setCollectionImportResults({});
         setError(data?.error || "Không thể phân tích link import");
         return;
       }
@@ -771,18 +773,23 @@ export default function CustomizerPage() {
       setImportTarget(data.target);
       if (data.target.type === "collection") {
         const nextChecks = {};
+        const nextResults = {};
         for (const product of data.target.products || []) {
           const url = String(product?.url || "");
           if (!url) continue;
           nextChecks[url] = true;
+          nextResults[url] = { status: "idle", message: "" };
         }
         setCollectionChecks(nextChecks);
+        setCollectionImportResults(nextResults);
       } else {
         setCollectionChecks({});
+        setCollectionImportResults({});
       }
     } catch {
       setImportTarget(null);
       setCollectionChecks({});
+      setCollectionImportResults({});
       setError("Lỗi kết nối server");
     } finally {
       setInspectingLink(false);
@@ -868,6 +875,26 @@ export default function CustomizerPage() {
     setBatchImporting(true);
     setError(null);
     setNotice(null);
+    const selectedUrlSet = new Set(selected.map((item) => String(item?.url || "")));
+    setCollectionImportResults((prev) => {
+      const next = { ...prev };
+      for (const item of selected) {
+        const key = String(item?.url || "");
+        if (!key) continue;
+        next[key] = {
+          status: "queued",
+          message: "",
+        };
+      }
+      for (const key of Object.keys(next)) {
+        if (!selectedUrlSet.has(key)) {
+          if (next[key]?.status === "running") {
+            next[key] = { status: "idle", message: "" };
+          }
+        }
+      }
+      return next;
+    });
     setBatchProgress({
       total: selected.length,
       done: 0,
@@ -886,6 +913,13 @@ export default function CustomizerPage() {
     for (let i = 0; i < selected.length; i += 1) {
       const item = selected[i];
       const url = String(item?.url || "");
+      setCollectionImportResults((prev) => ({
+        ...prev,
+        [url]: {
+          status: "running",
+          message: "",
+        },
+      }));
       setBatchProgress({
         total: selected.length,
         done: i,
@@ -901,10 +935,33 @@ export default function CustomizerPage() {
         if (data?.product?.id) lastImportedId = String(data.product.id);
         if (Array.isArray(data?.warnings) && data.warnings.length > 0) {
           warningBag.push(`${item?.title || url}: ${data.warnings.join(" | ")}`);
+          setCollectionImportResults((prev) => ({
+            ...prev,
+            [url]: {
+              status: "success",
+              message: data.warnings.join(" | "),
+            },
+          }));
+        } else {
+          setCollectionImportResults((prev) => ({
+            ...prev,
+            [url]: {
+              status: "success",
+              message: "",
+            },
+          }));
         }
       } catch (error) {
         failed += 1;
-        errors.push(`${item?.title || url}: ${error?.message || "Import failed"}`);
+        const message = error?.message || "Import failed";
+        errors.push(`${item?.title || url}: ${message}`);
+        setCollectionImportResults((prev) => ({
+          ...prev,
+          [url]: {
+            status: "failed",
+            message,
+          },
+        }));
       }
     }
 
@@ -1714,6 +1771,7 @@ export default function CustomizerPage() {
                   setImportUrl(nextValue);
                   setImportTarget(null);
                   setCollectionChecks({});
+                  setCollectionImportResults({});
                   setBatchProgress(null);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && !inspectingLink && handleInspectImportUrl()}
@@ -1836,6 +1894,8 @@ export default function CustomizerPage() {
                   {collectionProducts.map((product) => {
                     const url = String(product?.url || "");
                     const checked = Boolean(collectionChecks[url]);
+                    const rowResult = collectionImportResults[url] || { status: "idle", message: "" };
+                    const rowStatus = String(rowResult.status || "idle");
                     return (
                       <label key={url} className="collection-product-row">
                         <input
@@ -1845,8 +1905,24 @@ export default function CustomizerPage() {
                           disabled={batchImporting}
                         />
                         <div className="collection-product-main">
-                          <div className="collection-product-title">{product?.title || product?.handle || url}</div>
+                          <div className="collection-product-title-row">
+                            <div className="collection-product-title">{product?.title || product?.handle || url}</div>
+                            <span className={`import-row-status status-${rowStatus}`}>
+                              {rowStatus === "success"
+                                ? "Success"
+                                : rowStatus === "failed"
+                                  ? "Fail"
+                                  : rowStatus === "running"
+                                    ? "Running"
+                                    : rowStatus === "queued"
+                                      ? "Queued"
+                                      : "Pending"}
+                            </span>
+                          </div>
                           <div className="collection-product-url">{url}</div>
+                          {rowResult?.message ? (
+                            <div className="collection-product-message">{rowResult.message}</div>
+                          ) : null}
                         </div>
                       </label>
                     );
