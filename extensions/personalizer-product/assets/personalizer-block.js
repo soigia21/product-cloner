@@ -5,7 +5,7 @@
   const PREVIEW_EVENT = "product-cloner:preview-updated";
   const INTERACTION_EVENT = "product-cloner:user-interacted";
   const MIN_HEIGHT = 0;
-  const MAX_HEIGHT = 2200;
+  const MAX_HEIGHT = 24000;
   const DEFAULT_HEIGHT = 220;
   const PREVIEW_RETRY_DELAY_MS = 240;
   const PREVIEW_RETRY_MAX_ATTEMPTS = 28;
@@ -438,7 +438,7 @@
       iframe.setAttribute("scrolling", "no");
       iframe.src = embedUrl.toString();
       iframe.style.height = `${DEFAULT_HEIGHT}px`;
-      iframe.style.overflow = "hidden";
+      iframe.style.overflow = "visible";
       shell.appendChild(iframe);
       root.appendChild(shell);
 

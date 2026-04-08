@@ -482,51 +482,6 @@ export default function CustomizerPage() {
     } catch { }
   }, [isEmbedded, activeProduct, embeddedContext.templateId]);
 
-  const drawPreviewBlobToCanvas = useCallback(async (blob, requestId = null) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !blob) return;
-
-    let objectUrl = "";
-    let bitmap = null;
-    let img = null;
-    try {
-      if (typeof window !== "undefined" && typeof window.createImageBitmap === "function") {
-        bitmap = await window.createImageBitmap(blob);
-      } else {
-        objectUrl = URL.createObjectURL(blob);
-        img = await new Promise((resolve, reject) => {
-          const next = new Image();
-          next.onload = () => resolve(next);
-          next.onerror = () => reject(new Error("Không thể decode preview image"));
-          next.src = objectUrl;
-        });
-      }
-
-      if (requestId !== null && requestId !== previewRequestRef.current) return;
-
-      const width = Number(bitmap?.width || img?.naturalWidth || img?.width || 0);
-      const height = Number(bitmap?.height || img?.naturalHeight || img?.height || 0);
-      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
-
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(bitmap || img, 0, 0, width, height);
-      setPreviewAspectRatio(width / height);
-      setHasCanvasFrame(true);
-      emitPreviewToParent(canvas);
-    } finally {
-      if (bitmap && typeof bitmap.close === "function") {
-        bitmap.close();
-      }
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    }
-  }, [emitPreviewToParent]);
-
   const notifyInteractionToParent = useCallback((payload = {}) => {
     if (!isEmbedded || typeof window === "undefined") return;
     if (window.parent === window) return;
@@ -1169,58 +1124,6 @@ export default function CustomizerPage() {
       const controller = new AbortController();
       previewAbortRef.current = controller;
       try {
-        if (isEmbedded) {
-          const visibilityReq = applyTraceToForm
-            ? fetch(`/api/products/${productId}/visibility`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                selections: sels,
-                textInputs: texts,
-                userSelections: manual,
-                uploadInputs: uploadPayload,
-              }),
-              signal: controller.signal,
-            })
-            : Promise.resolve(null);
-
-          const previewReq = fetch(`/api/products/${productId}/preview`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              selections: sels,
-              textInputs: texts,
-              userSelections: manual,
-              uploadInputs: uploadPayload,
-              uploadTransforms: transformPayload,
-            }),
-            signal: controller.signal,
-          });
-
-          const [visibilityRes, previewRes] = await Promise.all([visibilityReq, previewReq]);
-          if (reqId !== previewRequestRef.current) return;
-
-          if (visibilityRes && visibilityRes.ok) {
-            const visibilityData = await visibilityRes.json();
-            if (reqId === previewRequestRef.current && visibilityData?.success) {
-              setVisibleOptionIds(visibilityData.visibleOptionIds || []);
-              setUiForceShowOptionIds(visibilityData.uiForceShowOptionIds || []);
-              if (applyTraceToForm) {
-                setSelections(visibilityData.selections || sels || {});
-              }
-            }
-          }
-
-          if (previewRes.ok) {
-            const blob = await previewRes.blob();
-            if (reqId === previewRequestRef.current) {
-              latestTraceRef.current = null;
-              await drawPreviewBlobToCanvas(blob, reqId);
-            }
-          }
-          return;
-        }
-
         const res = await fetch(`/api/products/${productId}/workflow-trace`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1251,15 +1154,13 @@ export default function CustomizerPage() {
       } finally {
         if (reqId === previewRequestRef.current && blockWithLoader) setPreviewLoading(false);
       }
-    }, 180); // reduce latency while still coalescing rapid changes
+    }, 120); // lower debounce for snappier variant switching
   }, [
     drawTraceToCanvas,
-    drawPreviewBlobToCanvas,
     userSelections,
     uploadInputs,
     uploadTransformsByHolderId,
     hasCanvasFrame,
-    isEmbedded,
   ]);
 
   useEffect(() => {
@@ -1339,6 +1240,10 @@ export default function CustomizerPage() {
   const handleTextChange = (optionCid, text) => {
     const newTexts = { ...textInputs, [optionCid]: text };
     setTextInputs(newTexts);
+    notifyInteractionToParent({
+      source: "text",
+      optionId: String(optionCid || ""),
+    });
     requestPreview(activeProduct, selections, newTexts, userSelections);
   };
 
@@ -1370,6 +1275,10 @@ export default function CustomizerPage() {
       setUploadInputs(nextUploads);
       setUploadTransforms(nextTransforms);
       setFocusedUploadOptionId(optionCid);
+      notifyInteractionToParent({
+        source: "upload",
+        optionId: String(optionCid || ""),
+      });
       requestPreview(activeProduct, selections, textInputs, userSelections, {
         uploadInputs: nextUploads,
         uploadTransforms: buildUploadTransformsByHolder(nextTransforms),
@@ -1398,6 +1307,10 @@ export default function CustomizerPage() {
       resizeRef.current = null;
       rotateRef.current = null;
     }
+    notifyInteractionToParent({
+      source: "upload-clear",
+      optionId: String(optionCid || ""),
+    });
     requestPreview(activeProduct, selections, textInputs, userSelections, {
       uploadInputs: nextUploads,
       uploadTransforms: buildUploadTransformsByHolder(nextTransforms),
