@@ -1660,7 +1660,9 @@ export default function CustomizerPage() {
   const hasFocusedUpload = Boolean(
     focusedUploadOptionId && uploadInputs?.[String(focusedUploadOptionId)]
   );
-  const hideEmbeddedPreview = isEmbedded;
+  // Embedded mode keeps preview hidden by default,
+  // but upload editing needs the canvas/frame visible.
+  const hideEmbeddedPreview = isEmbedded && !hasFocusedUpload;
   const focusedUploadLayer = findFocusedUploadLayer();
   const focusedUploadFrameStyle = (() => {
     if (!hasFocusedUpload || !focusedUploadLayer) return null;
