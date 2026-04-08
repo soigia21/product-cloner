@@ -48,6 +48,10 @@ function inferImportLinkType(rawUrl) {
   }
 }
 
+function parseQueryBoolean(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+}
+
 function normalizeUploadTransform(raw) {
   const offsetX = Number(raw?.offsetX);
   const offsetY = Number(raw?.offsetY);
@@ -86,15 +90,20 @@ export default function CustomizerPage() {
         templateId: "",
         productId: "",
         handle: "",
+        hidePreview: false,
       };
     }
     const qs = new URLSearchParams(window.location.search);
+    const embedded = parseQueryBoolean(qs.get("embedded"));
+    const hidePreview = parseQueryBoolean(qs.get("hide_preview"));
+    const previewTarget = String(qs.get("preview_target") || "").trim().toLowerCase();
+    const previewToMainImage = ["main_image", "main-image"].includes(previewTarget);
     return {
-      embedded:
-        ["1", "true", "yes", "on"].includes(String(qs.get("embedded") || "").toLowerCase()),
+      embedded: embedded || hidePreview || previewToMainImage,
       templateId: String(qs.get("template_id") || "").trim(),
       productId: String(qs.get("product_id") || "").trim(),
       handle: String(qs.get("handle") || "").trim(),
+      hidePreview: hidePreview || previewToMainImage,
     };
   }, []);
   const isEmbedded = Boolean(embeddedContext.embedded);
@@ -1667,7 +1676,7 @@ export default function CustomizerPage() {
   const hasFocusedUpload = Boolean(
     focusedUploadOptionId && uploadInputs?.[String(focusedUploadOptionId)]
   );
-  const hideEmbeddedPreview = isEmbedded;
+  const hideEmbeddedPreview = Boolean(isEmbedded || embeddedContext.hidePreview);
   const focusedUploadLayer = findFocusedUploadLayer();
   const focusedUploadFrameStyle = (() => {
     if (!hasFocusedUpload || !focusedUploadLayer) return null;
@@ -2361,9 +2370,7 @@ export default function CustomizerPage() {
         <div className={`customizer-layout ${hideEmbeddedPreview ? "without-preview" : ""}`}>
           {/* Left: Preview */}
           {hideEmbeddedPreview ? (
-            <div className="preview-image-wrapper preview-image-wrapper--hidden" aria-hidden="true">
-              <canvas ref={canvasRef} className="preview-canvas" />
-            </div>
+            <canvas ref={canvasRef} className="preview-canvas preview-canvas--offscreen" aria-hidden="true" />
           ) : (
             <div
               className={`preview-image-wrapper ${focusedUploadOptionId ? "upload-editing" : ""}`}

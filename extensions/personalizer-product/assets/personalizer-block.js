@@ -293,6 +293,14 @@
     };
   }
 
+  function clearEditHideTimer(linked) {
+    if (!linked) return;
+    if (linked.editHideTimer) {
+      clearTimeout(linked.editHideTimer);
+      linked.editHideTimer = null;
+    }
+  }
+
   function postEditAction(linked, action, amount = 0) {
     if (!linked?.iframe?.contentWindow) return;
     try {
@@ -395,14 +403,17 @@
       bar.setAttribute("hidden", "hidden");
       return;
     }
+    clearEditHideTimer(linked);
 
     const hostInfo = resolveMainImageHost(linked.root);
-    if (!hostInfo?.host) {
+    let host = hostInfo?.host || null;
+    if (!host && linked.editBarHost && linked.editBarHost.isConnected) {
+      host = linked.editBarHost;
+    }
+    if (!host) {
       bar.setAttribute("hidden", "hidden");
       return;
     }
-
-    const host = hostInfo.host;
     if (window.getComputedStyle(host).position === "static") {
       host.style.position = "relative";
     }
@@ -423,6 +434,7 @@
 
   function clearPreviewRetry(linked) {
     if (!linked) return;
+    clearEditHideTimer(linked);
     if (linked.retryTimer) {
       clearTimeout(linked.retryTimer);
       linked.retryTimer = null;
@@ -527,6 +539,8 @@
 
     const params = url.searchParams;
     params.set("embedded", "1");
+    params.set("hide_preview", "1");
+    params.set("preview_target", "main_image");
 
     const templateId = String(root.dataset.templateId || "").trim();
     const productId = String(root.dataset.productId || "").trim();
@@ -556,6 +570,7 @@
       editState: existing.editState || { editable: false, optionId: "", transform: normalizeEditTransform({}) },
       editBar: existing.editBar || null,
       editBarHost: existing.editBarHost || null,
+      editHideTimer: existing.editHideTimer || null,
     };
     iframeByWindow.set(iframe.contentWindow, linked);
     bindMediaObserver(linked);
@@ -675,12 +690,14 @@
       linked.userInteracted = true;
       const source = String(payload.source || "");
       if (source === "upload-focus") {
+        clearEditHideTimer(linked);
         linked.editState = {
           editable: true,
           optionId: String(payload.optionId || ""),
           transform: linked.editState?.transform || normalizeEditTransform({}),
         };
       } else if (source === "upload-clear") {
+        clearEditHideTimer(linked);
         linked.editState = {
           editable: false,
           optionId: "",
@@ -695,11 +712,35 @@
     }
 
     if (payload.type === EDIT_STATE_EVENT) {
+      const nextEditable = Boolean(payload.editable);
+      const nextOptionId = String(payload.optionId || "");
+      const nextTransform = normalizeEditTransform(payload.transform || {});
+      if (nextEditable) {
+        clearEditHideTimer(linked);
+        linked.editState = {
+          editable: true,
+          optionId: nextOptionId,
+          transform: nextTransform,
+        };
+        syncMainEditBar(linked);
+        return;
+      }
+
       linked.editState = {
-        editable: Boolean(payload.editable),
-        optionId: String(payload.optionId || ""),
-        transform: normalizeEditTransform(payload.transform || {}),
+        editable: true,
+        optionId: linked.editState?.optionId || nextOptionId,
+        transform: nextTransform,
       };
+      clearEditHideTimer(linked);
+      linked.editHideTimer = setTimeout(() => {
+        linked.editHideTimer = null;
+        linked.editState = {
+          editable: false,
+          optionId: "",
+          transform: nextTransform,
+        };
+        syncMainEditBar(linked);
+      }, 450);
       syncMainEditBar(linked);
     }
   });
