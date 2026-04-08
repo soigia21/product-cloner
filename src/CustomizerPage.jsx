@@ -22,6 +22,9 @@ const DEFAULT_UPLOAD_TRANSFORM = Object.freeze({
   rotation: 0,
 });
 
+const PARENT_UPLOAD_EDIT_STATE_EVENT = "product-cloner:upload-edit-state";
+const PARENT_UPLOAD_EDIT_ACTION_EVENT = "product-cloner:upload-edit-action";
+
 function stripHtml(raw) {
   return String(raw || "")
     .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, " ")
@@ -1351,6 +1354,10 @@ export default function CustomizerPage() {
     draggingRef.current = null;
     resizeRef.current = null;
     rotateRef.current = null;
+    notifyInteractionToParent({
+      source: "upload-focus",
+      optionId: optionCid,
+    });
   };
 
   const handleUploadTransformAction = (optionId, action, amount = 0) => {
@@ -1660,9 +1667,7 @@ export default function CustomizerPage() {
   const hasFocusedUpload = Boolean(
     focusedUploadOptionId && uploadInputs?.[String(focusedUploadOptionId)]
   );
-  // Embedded mode keeps preview hidden by default,
-  // but upload editing needs the canvas/frame visible.
-  const hideEmbeddedPreview = isEmbedded && !hasFocusedUpload;
+  const hideEmbeddedPreview = isEmbedded;
   const focusedUploadLayer = findFocusedUploadLayer();
   const focusedUploadFrameStyle = (() => {
     if (!hasFocusedUpload || !focusedUploadLayer) return null;
@@ -1691,6 +1696,57 @@ export default function CustomizerPage() {
     if (!focusedUploadOptionId) return;
     handleUploadTransformAction(String(focusedUploadOptionId), action, amount);
   };
+
+  useEffect(() => {
+    if (!isEmbedded || typeof window === "undefined") return;
+    if (window.parent === window) return;
+    try {
+      window.parent.postMessage(
+        {
+          type: PARENT_UPLOAD_EDIT_STATE_EVENT,
+          templateId: String(activeProduct || embeddedContext.templateId || ""),
+          editable: Boolean(hasFocusedUpload),
+          optionId: hasFocusedUpload ? String(focusedUploadOptionId || "") : "",
+          transform: {
+            offsetX: focusedUploadTransform.offsetX,
+            offsetY: focusedUploadTransform.offsetY,
+            scale: focusedUploadTransform.scale,
+            rotation: focusedUploadTransform.rotation,
+          },
+        },
+        "*"
+      );
+    } catch { }
+  }, [
+    isEmbedded,
+    activeProduct,
+    embeddedContext.templateId,
+    hasFocusedUpload,
+    focusedUploadOptionId,
+    focusedUploadTransform.offsetX,
+    focusedUploadTransform.offsetY,
+    focusedUploadTransform.scale,
+    focusedUploadTransform.rotation,
+  ]);
+
+  useEffect(() => {
+    if (!isEmbedded || typeof window === "undefined") return;
+    const onMessage = (event) => {
+      const payload = event?.data;
+      if (!payload || payload.type !== PARENT_UPLOAD_EDIT_ACTION_EVENT) return;
+      const action = String(payload.action || "").trim();
+      if (!action) return;
+      if (!focusedUploadOptionId) return;
+      const amount = Number(payload.amount);
+      handleUploadTransformAction(
+        String(focusedUploadOptionId),
+        action,
+        Number.isFinite(amount) ? amount : 0
+      );
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [isEmbedded, focusedUploadOptionId, handleUploadTransformAction]);
 
   const handleCleanupOld = async () => {
     if (cleaningOld || products.length <= 1) return;
@@ -2415,6 +2471,7 @@ export default function CustomizerPage() {
             options={options}
             visibleOptionIds={visibleOptionIds}
             uiForceShowOptionIds={uiForceShowOptionIds}
+            embeddedMode={isEmbedded}
             selections={selections}
             textInputs={textInputs}
             uploadInputs={uploadInputs}

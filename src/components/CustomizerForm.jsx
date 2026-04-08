@@ -189,7 +189,7 @@ function TextInputOption({ option, value, onChange }) {
       />
       {helpText ? <div className="text-input-help">{helpText}</div> : null}
       <div className="text-input-hint">
-        {(value || "").length}/{maxLength} ký tự
+        {(value || "").length}/{maxLength} characters
       </div>
     </div>
   );
@@ -224,6 +224,7 @@ function ImageUploadOption({
   option,
   uploadValue,
   isEditing = false,
+  embeddedMode = false,
   uploading = false,
   onUpload,
   onClear,
@@ -287,7 +288,11 @@ function ImageUploadOption({
       {uploadedName ? <div className="text-input-hint">{uploadedName}</div> : null}
       {uploadedUrl ? (
         <div className="upload-editor-hint">
-          {isEditing ? "Đang chỉnh: kéo trực tiếp trên preview để di chuyển/zoom ảnh." : "Click vào ảnh để bật chế độ chỉnh."}
+          {isEditing
+            ? (embeddedMode
+              ? "Editing in progress: use the edit bar on main product image."
+              : "Editing in progress: drag directly on the preview to move/zoom the image.")
+            : "Click on the image to activate editing mode."}
         </div>
       ) : null}
 
@@ -300,6 +305,7 @@ export default function CustomizerForm({
   options,
   visibleOptionIds,
   uiForceShowOptionIds = [],
+  embeddedMode = false,
   selections,
   textInputs,
   uploadInputs,
@@ -404,6 +410,7 @@ export default function CustomizerForm({
                 option={opt}
                 uploadValue={uploadValue}
                 isEditing={isEditing}
+                embeddedMode={embeddedMode}
                 uploading={uploading}
                 onUpload={(file) => onUploadChange(String(opt.id), file)}
                 onClear={() => onUploadClear(String(opt.id))}

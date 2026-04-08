@@ -4,6 +4,8 @@
   const EMBED_EVENT = "product-cloner:embedded-resize";
   const PREVIEW_EVENT = "product-cloner:preview-updated";
   const INTERACTION_EVENT = "product-cloner:user-interacted";
+  const EDIT_STATE_EVENT = "product-cloner:upload-edit-state";
+  const EDIT_ACTION_EVENT = "product-cloner:upload-edit-action";
   const MIN_HEIGHT = 0;
   const MAX_HEIGHT = 24000;
   const DEFAULT_HEIGHT = 220;
@@ -278,6 +280,131 @@
     return appliedCount > 0;
   }
 
+  function normalizeEditTransform(raw) {
+    const offsetX = Number(raw?.offsetX);
+    const offsetY = Number(raw?.offsetY);
+    const scale = Number(raw?.scale);
+    const rotation = Number(raw?.rotation);
+    return {
+      offsetX: Number.isFinite(offsetX) ? offsetX : 0,
+      offsetY: Number.isFinite(offsetY) ? offsetY : 0,
+      scale: Number.isFinite(scale) ? scale : 1,
+      rotation: Number.isFinite(rotation) ? rotation : 0,
+    };
+  }
+
+  function postEditAction(linked, action, amount = 0) {
+    if (!linked?.iframe?.contentWindow) return;
+    try {
+      linked.iframe.contentWindow.postMessage(
+        {
+          type: EDIT_ACTION_EVENT,
+          action,
+          amount,
+        },
+        linked.expectedOrigin || "*"
+      );
+    } catch { }
+  }
+
+  function createEditButton(linked, label, action, amount = 0, className = "") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `pz-main-edit-btn ${className}`.trim();
+    btn.textContent = label;
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      postEditAction(linked, action, amount);
+    });
+    return btn;
+  }
+
+  function ensureMainEditBar(linked) {
+    if (!linked) return null;
+    if (linked.editBar && linked.editBar instanceof HTMLElement) return linked.editBar;
+
+    const bar = document.createElement("div");
+    bar.className = "pz-main-edit-bar";
+    bar.setAttribute("hidden", "hidden");
+
+    const row = document.createElement("div");
+    row.className = "pz-main-edit-row";
+    const controls = [
+      ["−", "zoom", -0.08],
+      ["+", "zoom", 0.08],
+      ["↑", "moveY", -8, "is-arrow"],
+      ["↓", "moveY", 8, "is-arrow"],
+      ["←", "moveX", -8, "is-arrow"],
+      ["→", "moveX", 8, "is-arrow"],
+      ["↺", "rotate", -3, "is-arrow"],
+      ["↻", "rotate", 3, "is-arrow"],
+      ["Reset", "reset", 0],
+    ];
+    for (const [label, action, amount, className] of controls) {
+      row.appendChild(createEditButton(linked, label, action, amount, className || ""));
+    }
+
+    const state = document.createElement("div");
+    state.className = "pz-main-edit-state";
+    state.textContent = "";
+
+    bar.appendChild(row);
+    bar.appendChild(state);
+    linked.editBar = bar;
+    return bar;
+  }
+
+  function resolveMainImageHost(root) {
+    const targets = collectFeaturedImages(root);
+    if (!targets || targets.length === 0) return null;
+    const image = targets[0];
+    const host =
+      image.closest(
+        "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery, media-gallery"
+      ) ||
+      image.parentElement ||
+      null;
+    if (!(host instanceof HTMLElement)) return null;
+    return { image, host };
+  }
+
+  function syncMainEditBar(linked) {
+    if (!linked) return;
+    const bar = ensureMainEditBar(linked);
+    if (!bar) return;
+
+    const editable = Boolean(linked.editState?.editable);
+    if (!editable) {
+      bar.setAttribute("hidden", "hidden");
+      return;
+    }
+
+    const hostInfo = resolveMainImageHost(linked.root);
+    if (!hostInfo?.host) {
+      bar.setAttribute("hidden", "hidden");
+      return;
+    }
+
+    const host = hostInfo.host;
+    if (window.getComputedStyle(host).position === "static") {
+      host.style.position = "relative";
+    }
+
+    if (linked.editBarHost !== host || bar.parentElement !== host) {
+      host.appendChild(bar);
+      linked.editBarHost = host;
+    }
+
+    const transform = normalizeEditTransform(linked.editState?.transform || {});
+    const stateNode = bar.querySelector(".pz-main-edit-state");
+    if (stateNode) {
+      stateNode.textContent = `X: ${transform.offsetX.toFixed(1)} | Y: ${transform.offsetY.toFixed(1)} | Zoom: ${transform.scale.toFixed(2)} | R: ${transform.rotation.toFixed(1)}°`;
+    }
+
+    bar.removeAttribute("hidden");
+  }
+
   function clearPreviewRetry(linked) {
     if (!linked) return;
     if (linked.retryTimer) {
@@ -300,6 +427,7 @@
       linked.lastPreviewUrl = linked.pendingPreviewUrl;
       linked.lastAppliedPreviewUrl = linked.pendingPreviewUrl;
       clearPreviewRetry(linked);
+      syncMainEditBar(linked);
       return true;
     }
 
@@ -330,6 +458,7 @@
         if (linked.pendingPreviewUrl) {
           tryApplyPendingPreview(linked);
         }
+        syncMainEditBar(linked);
       }, MEDIA_MUTATION_DEBOUNCE_MS);
     });
 
@@ -408,9 +537,13 @@
       retryAttempts: existing.retryAttempts || 0,
       observer: existing.observer || null,
       observerDebounceTimer: existing.observerDebounceTimer || null,
+      editState: existing.editState || { editable: false, optionId: "", transform: normalizeEditTransform({}) },
+      editBar: existing.editBar || null,
+      editBarHost: existing.editBarHost || null,
     };
     iframeByWindow.set(iframe.contentWindow, linked);
     bindMediaObserver(linked);
+    syncMainEditBar(linked);
     if (linked.userInteracted && linked.pendingPreviewUrl) {
       tryApplyPendingPreview(linked);
     }
@@ -518,6 +651,7 @@
       if (!linked.userInteracted) return;
       if (previewUrl === linked.lastAppliedPreviewUrl) return;
       tryApplyPendingPreview(linked);
+      syncMainEditBar(linked);
       return;
     }
 
@@ -526,6 +660,17 @@
       if (linked.pendingPreviewUrl) {
         tryApplyPendingPreview(linked);
       }
+      syncMainEditBar(linked);
+      return;
+    }
+
+    if (payload.type === EDIT_STATE_EVENT) {
+      linked.editState = {
+        editable: Boolean(payload.editable),
+        optionId: String(payload.optionId || ""),
+        transform: normalizeEditTransform(payload.transform || {}),
+      };
+      syncMainEditBar(linked);
     }
   });
 
