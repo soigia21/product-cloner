@@ -173,22 +173,100 @@
     }
   }
 
-  function setImageSource(img, previewUrl) {
+  function restoreOriginalImageSource(img) {
     if (!(img instanceof HTMLImageElement)) return;
-    img.src = previewUrl;
-    img.setAttribute("data-src", previewUrl);
+    const original = String(img.dataset.pzOriginalSrc || "").trim();
+    if (!original) return;
+
+    const current = String(img.currentSrc || img.src || "");
+    if (img.dataset.pzPreviewApplied !== "1" && !current.startsWith("data:image/")) return;
+
+    img.src = original;
+    img.setAttribute("data-src", original);
     img.removeAttribute("srcset");
     img.removeAttribute("sizes");
-    img.setAttribute("data-pz-preview-applied", "1");
+    img.removeAttribute("data-pz-preview-applied");
 
     const pic = img.closest("picture");
-    if (pic) {
-      const sources = pic.querySelectorAll("source");
-      for (const source of sources) {
-        source.setAttribute("srcset", previewUrl);
-        source.setAttribute("data-srcset", previewUrl);
-      }
+    if (!pic) return;
+    const sources = pic.querySelectorAll("source");
+    for (const source of sources) {
+      source.setAttribute("srcset", original);
+      source.setAttribute("data-srcset", original);
     }
+  }
+
+  function restoreLegacyReplacedImages(root) {
+    const scope = getRootSection(root) || document;
+    const replaced = scope.querySelectorAll("img[data-pz-preview-applied='1']");
+    for (const img of replaced) {
+      restoreOriginalImageSource(img);
+    }
+  }
+
+  function ensureMainPreviewCanvas(linked, host) {
+    if (!linked || !(host instanceof HTMLElement)) return null;
+    let canvas = linked.previewCanvas;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      canvas = document.createElement("canvas");
+      canvas.className = "pz-main-preview-canvas";
+      canvas.setAttribute("hidden", "hidden");
+      linked.previewCanvas = canvas;
+    }
+    if (window.getComputedStyle(host).position === "static") {
+      host.style.position = "relative";
+    }
+    if (canvas.parentElement !== host) {
+      host.appendChild(canvas);
+    }
+    linked.previewCanvasHost = host;
+    return canvas;
+  }
+
+  function syncPreviewCanvasBounds(host, image, canvas) {
+    if (!(host instanceof HTMLElement) || !(image instanceof HTMLImageElement) || !(canvas instanceof HTMLCanvasElement)) {
+      return false;
+    }
+    const hostRect = host.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+    const drawWidth = Math.max(1, Math.round(imageRect.width));
+    const drawHeight = Math.max(1, Math.round(imageRect.height));
+    if (drawWidth <= 1 || drawHeight <= 1) return false;
+
+    const left = Math.max(0, imageRect.left - hostRect.left);
+    const top = Math.max(0, imageRect.top - hostRect.top);
+
+    canvas.style.left = `${left}px`;
+    canvas.style.top = `${top}px`;
+    canvas.style.width = `${drawWidth}px`;
+    canvas.style.height = `${drawHeight}px`;
+
+    if (canvas.width !== drawWidth) canvas.width = drawWidth;
+    if (canvas.height !== drawHeight) canvas.height = drawHeight;
+    return true;
+  }
+
+  function paintPreviewToCanvas(linked, canvas, previewUrl) {
+    if (!linked || !(canvas instanceof HTMLCanvasElement)) return false;
+    const token = Number(linked.previewRenderToken || 0) + 1;
+    linked.previewRenderToken = token;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (token !== linked.previewRenderToken) return;
+      if (!(canvas instanceof HTMLCanvasElement)) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const w = Number(canvas.width) || 0;
+      const h = Number(canvas.height) || 0;
+      if (w <= 0 || h <= 0) return;
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.removeAttribute("hidden");
+    };
+    img.onerror = () => { };
+    img.src = previewUrl;
+    return true;
   }
 
   function collectFeaturedImages(root) {
@@ -254,30 +332,36 @@
       .map((entry) => entry.img);
   }
 
-  function applyPreviewAsMainImage(root, previewUrl) {
-    const targets = collectFeaturedImages(root);
-    if (!targets || targets.length === 0) return false;
-
-    let appliedCount = 0;
-    for (const img of targets) {
-      if (!img.dataset.pzOriginalSrc) {
-        img.dataset.pzOriginalSrc = img.currentSrc || img.src || "";
-      }
-      setImageSource(img, previewUrl);
-      appliedCount += 1;
+  function applyPreviewAsMainImage(linked, previewUrl) {
+    if (!linked) return false;
+    const hostInfo = resolveMainImageHost(linked.root);
+    if (!hostInfo?.host || !hostInfo?.image) return false;
+    const host = hostInfo.host;
+    const image = hostInfo.image;
+    if (!(image instanceof HTMLImageElement)) return false;
+    if (!image.dataset.pzOriginalSrc) {
+      image.dataset.pzOriginalSrc = image.currentSrc || image.src || "";
     }
+    restoreOriginalImageSource(image);
+
+    const canvas = ensureMainPreviewCanvas(linked, host);
+    if (!(canvas instanceof HTMLCanvasElement)) return false;
+    if (!syncPreviewCanvasBounds(host, image, canvas)) return false;
+    if (!paintPreviewToCanvas(linked, canvas, previewUrl)) return false;
 
     window.dispatchEvent(
       new CustomEvent("product-cloner:main-image-updated", {
         detail: {
           previewUrl,
-          count: appliedCount,
-          element: targets[0] || null,
+          count: 1,
+          element: image,
+          canvas,
+          host,
         },
       })
     );
 
-    return appliedCount > 0;
+    return true;
   }
 
   function normalizeEditTransform(raw) {
@@ -339,7 +423,7 @@
     const row = document.createElement("div");
     row.className = "pz-main-edit-row";
     const controls = [
-      ["−", "zoom", -0.08],
+      ["-", "zoom", -0.08],
       ["+", "zoom", 0.08],
       ["↑", "moveY", -8, "is-arrow"],
       ["↓", "moveY", 8, "is-arrow"],
@@ -398,7 +482,7 @@
     const bar = ensureMainEditBar(linked);
     if (!bar) return;
 
-    const editable = Boolean(linked.editState?.editable);
+    const editable = Boolean(linked.editState?.editable) && Boolean(linked.uploadFocused);
     if (!editable) {
       bar.setAttribute("hidden", "hidden");
       return;
@@ -448,9 +532,16 @@
 
   function tryApplyPendingPreview(linked) {
     if (!linked || !linked.pendingPreviewUrl) return false;
-    if (linked.pendingPreviewUrl === linked.lastAppliedPreviewUrl) return true;
+    if (linked.pendingPreviewUrl === linked.lastAppliedPreviewUrl) {
+      const refreshed = applyPreviewAsMainImage(linked, linked.pendingPreviewUrl);
+      if (refreshed) {
+        clearPreviewRetry(linked);
+        syncMainEditBar(linked);
+        return true;
+      }
+    }
 
-    const ok = applyPreviewAsMainImage(linked.root, linked.pendingPreviewUrl);
+    const ok = applyPreviewAsMainImage(linked, linked.pendingPreviewUrl);
     if (ok) {
       linked.lastPreviewUrl = linked.pendingPreviewUrl;
       linked.lastAppliedPreviewUrl = linked.pendingPreviewUrl;
@@ -571,8 +662,13 @@
       editBar: existing.editBar || null,
       editBarHost: existing.editBarHost || null,
       editHideTimer: existing.editHideTimer || null,
+      uploadFocused: Boolean(existing.uploadFocused),
+      previewCanvas: existing.previewCanvas || null,
+      previewCanvasHost: existing.previewCanvasHost || null,
+      previewRenderToken: Number(existing.previewRenderToken || 0),
     };
     iframeByWindow.set(iframe.contentWindow, linked);
+    restoreLegacyReplacedImages(root);
     bindMediaObserver(linked);
     syncMainEditBar(linked);
     if (linked.userInteracted && linked.pendingPreviewUrl) {
@@ -690,6 +786,7 @@
       linked.userInteracted = true;
       const source = String(payload.source || "");
       if (source === "upload-focus") {
+        linked.uploadFocused = true;
         clearEditHideTimer(linked);
         linked.editState = {
           editable: true,
@@ -697,6 +794,7 @@
           transform: linked.editState?.transform || normalizeEditTransform({}),
         };
       } else if (source === "upload-clear") {
+        linked.uploadFocused = false;
         clearEditHideTimer(linked);
         linked.editState = {
           editable: false,
@@ -716,6 +814,7 @@
       const nextOptionId = String(payload.optionId || "");
       const nextTransform = normalizeEditTransform(payload.transform || {});
       if (nextEditable) {
+        linked.uploadFocused = true;
         clearEditHideTimer(linked);
         linked.editState = {
           editable: true,
@@ -726,21 +825,13 @@
         return;
       }
 
+      linked.uploadFocused = false;
+      clearEditHideTimer(linked);
       linked.editState = {
-        editable: true,
-        optionId: linked.editState?.optionId || nextOptionId,
+        editable: false,
+        optionId: nextOptionId,
         transform: nextTransform,
       };
-      clearEditHideTimer(linked);
-      linked.editHideTimer = setTimeout(() => {
-        linked.editHideTimer = null;
-        linked.editState = {
-          editable: false,
-          optionId: "",
-          transform: nextTransform,
-        };
-        syncMainEditBar(linked);
-      }, 450);
       syncMainEditBar(linked);
     }
   });
