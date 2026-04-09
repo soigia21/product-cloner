@@ -661,31 +661,78 @@
 
   function bindIframeResize(iframe, expectedOrigin, root) {
     if (!iframe?.contentWindow) return;
-    const existing = iframeByWindow.get(iframe.contentWindow) || {};
-    const linked = {
-      iframe,
-      expectedOrigin,
-      root,
-      userInteracted: Boolean(existing.userInteracted),
-      lastPreviewUrl: existing.lastPreviewUrl || "",
-      lastAppliedPreviewUrl: existing.lastAppliedPreviewUrl || "",
-      pendingPreviewUrl: existing.pendingPreviewUrl || "",
-      retryTimer: existing.retryTimer || null,
-      retryAttempts: existing.retryAttempts || 0,
-      observer: existing.observer || null,
-      observerDebounceTimer: existing.observerDebounceTimer || null,
-      editState: existing.editState || { editable: false, optionId: "", transform: normalizeEditTransform({}) },
-      editBar: existing.editBar || null,
-      editBarHost: existing.editBarHost || null,
-      editHideTimer: existing.editHideTimer || null,
-      uploadFocused: Boolean(existing.uploadFocused),
-      previewCanvas: existing.previewCanvas || null,
-      previewCanvasHost: existing.previewCanvasHost || null,
-      previewRenderToken: Number(existing.previewRenderToken || 0),
-      lastFocusAt: Number(existing.lastFocusAt || 0),
-      lastEditStateAt: Number(existing.lastEditStateAt || 0),
-    };
-    iframeByWindow.set(iframe.contentWindow, linked);
+
+    // Cleanup stale links when iframe contentWindow rotates (navigation/reload).
+    for (const [win, stale] of iframeByWindow.entries()) {
+      if (win === iframe.contentWindow) continue;
+      if (!stale || stale.iframe !== iframe) continue;
+      clearPreviewRetry(stale);
+      if (stale.observer) {
+        try { stale.observer.disconnect(); } catch { }
+        stale.observer = null;
+      }
+      iframeByWindow.delete(win);
+    }
+
+    let linked = iframeByWindow.get(iframe.contentWindow);
+    if (!linked) {
+      linked = {
+        iframe,
+        expectedOrigin,
+        root,
+        userInteracted: false,
+        lastPreviewUrl: "",
+        lastAppliedPreviewUrl: "",
+        pendingPreviewUrl: "",
+        retryTimer: null,
+        retryAttempts: 0,
+        observer: null,
+        observerDebounceTimer: null,
+        editState: { editable: false, optionId: "", transform: normalizeEditTransform({}) },
+        editBar: null,
+        editBarHost: null,
+        editHideTimer: null,
+        uploadFocused: false,
+        previewCanvas: null,
+        previewCanvasHost: null,
+        previewRenderToken: 0,
+        lastFocusAt: 0,
+        lastEditStateAt: 0,
+      };
+      iframeByWindow.set(iframe.contentWindow, linked);
+    }
+
+    // Keep the same object reference so observer/message callbacks always see latest state.
+    linked.iframe = iframe;
+    linked.expectedOrigin = expectedOrigin;
+    linked.root = root;
+    linked.userInteracted = Boolean(linked.userInteracted);
+    linked.lastPreviewUrl = String(linked.lastPreviewUrl || "");
+    linked.lastAppliedPreviewUrl = String(linked.lastAppliedPreviewUrl || "");
+    linked.pendingPreviewUrl = String(linked.pendingPreviewUrl || "");
+    linked.retryTimer = linked.retryTimer || null;
+    linked.retryAttempts = Number(linked.retryAttempts || 0);
+    linked.observer = linked.observer || null;
+    linked.observerDebounceTimer = linked.observerDebounceTimer || null;
+    if (!linked.editState || typeof linked.editState !== "object") {
+      linked.editState = { editable: false, optionId: "", transform: normalizeEditTransform({}) };
+    } else {
+      linked.editState = {
+        editable: Boolean(linked.editState.editable),
+        optionId: String(linked.editState.optionId || ""),
+        transform: normalizeEditTransform(linked.editState.transform || {}),
+      };
+    }
+    linked.editBar = linked.editBar || null;
+    linked.editBarHost = linked.editBarHost || null;
+    linked.editHideTimer = linked.editHideTimer || null;
+    linked.uploadFocused = Boolean(linked.uploadFocused);
+    linked.previewCanvas = linked.previewCanvas || null;
+    linked.previewCanvasHost = linked.previewCanvasHost || null;
+    linked.previewRenderToken = Number(linked.previewRenderToken || 0);
+    linked.lastFocusAt = Number(linked.lastFocusAt || 0);
+    linked.lastEditStateAt = Number(linked.lastEditStateAt || 0);
+
     restoreLegacyReplacedImages(root);
     bindMediaObserver(linked);
     syncMainEditBar(linked);
