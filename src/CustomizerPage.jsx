@@ -392,6 +392,13 @@ export default function CustomizerPage() {
     return raw?.hex || "#000000";
   };
 
+  const resolveScaledLineWidth = (rawWidth, scaleY) => {
+    const width = Number(rawWidth);
+    if (!Number.isFinite(width) || width <= 0) return 0;
+    const scaled = width * (Number.isFinite(scaleY) && scaleY > 0 ? scaleY : 1);
+    return Math.max(1, scaled);
+  };
+
   const resolveFontHeightToSizeRatio = (fontFamily, measureCtx, ratioKey = null) => {
     if (!fontFamily || !measureCtx) return CUSTOMILY_TEXT_HEIGHT_TO_FONT_RATIO;
     const key = String(ratioKey || fontFamily);
@@ -588,7 +595,9 @@ export default function CustomizerPage() {
 
     const textPlanByHolder = new Map();
     for (const layer of (trace.textPlan || [])) {
-      if (layer.visible === false || !layer.text) continue;
+      const rawText = String(layer.text || "");
+      const drawText = layer.caps ? rawText.toUpperCase() : rawText;
+      if (layer.visible === false || !drawText) continue;
       const fontFamily = await getFontFamily(layer.fontPath, layer.fontUrl);
       const boxW = layer.width * scaleX;
       const fittedSize = resolveFixedFontSize(
@@ -685,7 +694,9 @@ export default function CustomizerPage() {
         continue;
       }
 
-      if (!layer.text) continue;
+      const rawText = String(layer.text || "");
+      const drawText = layer.caps ? rawText.toUpperCase() : rawText;
+      if (!drawText) continue;
       const textPlan = textPlanByHolder.get(String(layer.holderId));
       if (!textPlan) continue;
       const cx = layer.centerX * scaleX;
@@ -705,7 +716,29 @@ export default function CustomizerPage() {
       let textX = 0;
       if (layer.textAlign === "left") textX = -boxW / 2;
       else if (layer.textAlign === "right") textX = boxW / 2;
-      ctx.fillText(layer.text, textX, 0);
+
+      const outlineWidth = resolveScaledLineWidth(layer.outlineWidth, scaleY);
+      const strokeWidth = resolveScaledLineWidth(layer.strokeWidth, scaleY);
+      const outlineColor = parseColor(layer.outlineColor || layer.color);
+      const strokeColor = parseColor(layer.strokeColor);
+
+      if (outlineWidth > 0) {
+        ctx.lineJoin = "round";
+        ctx.miterLimit = 2;
+        ctx.lineWidth = outlineWidth;
+        ctx.strokeStyle = outlineColor;
+        ctx.strokeText(drawText, textX, 0);
+      }
+
+      if (strokeWidth > 0) {
+        ctx.lineJoin = "round";
+        ctx.miterLimit = 2;
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeStyle = strokeColor;
+        ctx.strokeText(drawText, textX, 0);
+      }
+
+      ctx.fillText(drawText, textX, 0);
       ctx.restore();
     }
 

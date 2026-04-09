@@ -225,6 +225,26 @@ function resolveFixedFontSize(holder, scaleY, fontFamily, measureCtx, ratioKey =
   return Math.max(minSize, Math.min(maxSize, preferred));
 }
 
+function parseColorValue(raw, fallback = "#000000") {
+  if (!raw) return fallback;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed?.hex || fallback;
+    } catch {
+      return raw;
+    }
+  }
+  return raw?.hex || fallback;
+}
+
+function resolveScaledLineWidth(rawWidth, scaleY) {
+  const width = Number(rawWidth);
+  if (!Number.isFinite(width) || width <= 0) return 0;
+  const scaled = width * (Number.isFinite(scaleY) && scaleY > 0 ? scaleY : 1);
+  return Math.max(1, scaled);
+}
+
 function resolveOutputSize(previewWidth) {
   const envSize = Number(process.env.CUSTOMILY_RENDER_SIZE);
   if (Number.isFinite(envSize) && envSize > 0) return Math.round(envSize);
@@ -832,15 +852,14 @@ export async function renderPreview(
     const boxW = plan.boxW;
 
     const fontFamily = plan.normalizedFontFamily;
-    const text = plan.text;
+    const text = holder.caps ? String(plan.text || "").toUpperCase() : String(plan.text || "");
+    if (!text) continue;
 
-    let color = "#000000";
-    try {
-      const colorObj = JSON.parse(holder.color);
-      color = colorObj.hex || "#000000";
-    } catch {
-      color = holder.color || "#000000";
-    }
+    const color = parseColorValue(holder.color, "#000000");
+    const outlineColor = parseColorValue(holder.outlineColor, color);
+    const strokeColor = parseColorValue(holder.strokeColor, "#000000");
+    const outlineWidth = resolveScaledLineWidth(holder.outlineWidth, scaleY);
+    const strokeWidth = resolveScaledLineWidth(holder.strokeWidth, scaleY);
 
     const fontSize = plan.normalizedSize;
 
@@ -857,6 +876,22 @@ export async function renderPreview(
     let textX = 0;
     if (holder.textAlign === "left") textX = -boxW / 2;
     else if (holder.textAlign === "right") textX = boxW / 2;
+
+    if (outlineWidth > 0) {
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 2;
+      ctx.lineWidth = outlineWidth;
+      ctx.strokeStyle = outlineColor;
+      ctx.strokeText(text, textX, 0);
+    }
+
+    if (strokeWidth > 0) {
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 2;
+      ctx.lineWidth = strokeWidth;
+      ctx.strokeStyle = strokeColor;
+      ctx.strokeText(text, textX, 0);
+    }
 
     ctx.fillText(text, textX, 0);
     ctx.restore();
@@ -977,7 +1012,12 @@ export async function getWorkflowTrace(productId, selections = {}, textInputs = 
       maxSizePx: holder.maxSizePx,
       initFontSize: holder.initFontSize,
       textAlign: holder.textAlign || "center",
+      caps: Boolean(holder.caps),
       color: holder.color || "#000000",
+      outlineWidth: holder.outlineWidth ?? 0,
+      outlineColor: holder.outlineColor || null,
+      strokeWidth: holder.strokeWidth ?? 0,
+      strokeColor: holder.strokeColor || null,
       opacity: holder.opacity !== undefined ? holder.opacity : 1,
     };
   });

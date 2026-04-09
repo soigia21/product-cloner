@@ -1319,6 +1319,7 @@ body.pz-embedded-body #root {
   color: var(--text-muted, #9aa0a6);
   margin-top: 6px;
   line-height: 1.35;
+  white-space: pre-line;
 }
 
 /* Checkbox */
