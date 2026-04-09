@@ -851,6 +851,19 @@
         return;
       }
 
+      if (linked.uploadFocused) {
+        // In embedded mode we can receive transient editable=false during React re-renders.
+        // Keep bar visible while upload is still focused; only hide on explicit upload-clear.
+        clearEditHideTimer(linked);
+        linked.editState = {
+          editable: true,
+          optionId: linked.editState?.optionId || nextOptionId,
+          transform: nextTransform,
+        };
+        syncMainEditBar(linked);
+        return;
+      }
+
       if (eventAt < Number(linked.lastFocusAt || 0)) {
         return;
       }
