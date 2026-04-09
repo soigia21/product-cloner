@@ -11,12 +11,19 @@
   const DEFAULT_HEIGHT = 220;
   const PREVIEW_RETRY_DELAY_MS = 240;
   const PREVIEW_RETRY_MAX_ATTEMPTS = 28;
+  const PREVIEW_UPLOAD_DEBOUNCE_MS = 460;
+  const PREVIEW_UPLOAD_TIMEOUT_MS = 9000;
   const MEDIA_MUTATION_DEBOUNCE_MS = 120;
   const MOUNT_OBSERVER_DEBOUNCE_MS = 60;
+  const CART_PROP_TEMPLATE_ID = "properties[_pz_template_id]";
+  const CART_PROP_PREVIEW_URL = "properties[_pz_preview_url]";
+  const CART_PROP_PREVIEW_PUBLIC = "properties[Preview]";
   const iframeByWindow = new Map();
   let mountObserver = null;
   let mountDebounceTimer = null;
   let globalStyleMounted = false;
+  let cartSubmitListenerBound = false;
+  let previewModalNode = null;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -28,6 +35,14 @@
 
   function parseBoolean(value) {
     return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+  }
+
+  function escapeSelectorValue(value) {
+    const raw = String(value || "");
+    if (typeof CSS !== "undefined" && CSS && typeof CSS.escape === "function") {
+      return CSS.escape(raw);
+    }
+    return raw.replace(/["\\]/g, "\\$&");
   }
 
   function isVisible(el) {
@@ -171,6 +186,299 @@
       if (values.size === 0) continue;
       setOptionWrapperHidden(container, values.size <= 1);
     }
+  }
+
+  function isAddToCartForm(form) {
+    if (!(form instanceof HTMLFormElement)) return false;
+    const action = String(form.getAttribute("action") || "").toLowerCase();
+    if (action.includes("/cart/add")) return true;
+    if (form.matches("form[action*='/cart/add'], form[action*='/cart/add.js']")) return true;
+    const submit = form.querySelector("button[type='submit'], input[type='submit']");
+    const variantInput = form.querySelector("input[name='id'], select[name='id']");
+    return Boolean(submit && variantInput);
+  }
+
+  function resolveCandidateCartForms(root) {
+    const section = getRootSection(root);
+    const selectors = [
+      "form[action*='/cart/add']",
+      "form[action*='/cart/add.js']",
+      "form[data-type='add-to-cart-form']",
+      "product-form form",
+      "form.product-form",
+    ];
+    const map = new Map();
+    const collect = (scope) => {
+      if (!scope || !scope.querySelectorAll) return;
+      for (const selector of selectors) {
+        for (const form of scope.querySelectorAll(selector)) {
+          if (!(form instanceof HTMLFormElement)) continue;
+          if (!isAddToCartForm(form)) continue;
+          if (!map.has(form)) map.set(form, form);
+        }
+      }
+    };
+    collect(section);
+    const localForms = [...map.values()];
+    if (localForms.length > 0) return localForms;
+    collect(document);
+    return [...map.values()];
+  }
+
+  function findLinkedForForm(form) {
+    if (!(form instanceof HTMLFormElement)) return null;
+    const formSection = getRootSection(form);
+    let best = null;
+    let bestScore = -Infinity;
+    for (const linked of iframeByWindow.values()) {
+      if (!linked?.root || !linked.root.isConnected) continue;
+      const root = linked.root;
+      const rootSection = getRootSection(root);
+      let score = 0;
+      if (formSection && rootSection && formSection === rootSection) score += 120;
+      if (formSection && rootSection && formSection.contains(root)) score += 24;
+      if (root.contains(form)) score += 50;
+      if (form.contains(root)) score += 14;
+      if (isVisible(root)) score += 8;
+      if (score > bestScore) {
+        best = linked;
+        bestScore = score;
+      }
+    }
+    if (bestScore < 18) return null;
+    return best;
+  }
+
+  function setHiddenFormValue(form, name, value) {
+    if (!(form instanceof HTMLFormElement)) return;
+    const key = String(name || "").trim();
+    if (!key) return;
+    const val = String(value || "");
+    let input = form.querySelector(`input[type='hidden'][name="${escapeSelectorValue(key)}"]`);
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = key;
+      form.appendChild(input);
+    }
+    input.value = val;
+  }
+
+  function removeHiddenFormValue(form, name) {
+    if (!(form instanceof HTMLFormElement)) return;
+    const key = String(name || "").trim();
+    if (!key) return;
+    const input = form.querySelector(`input[type='hidden'][name="${escapeSelectorValue(key)}"]`);
+    if (input) input.remove();
+  }
+
+  function resolvePreviewDisplayUrl(linked) {
+    if (!linked) return "";
+    const uploaded = String(linked.lastUploadedPreviewUrl || "").trim();
+    if (uploaded) return uploaded;
+    const pending = String(linked.pendingPreviewUrl || linked.lastAppliedPreviewUrl || "").trim();
+    if (pending.startsWith("data:image/")) return pending;
+    return "";
+  }
+
+  function syncCartProperties(linked) {
+    if (!linked?.root) return;
+    const templateId = String(linked.root.dataset.templateId || "").trim();
+    const previewUrl = String(linked.lastUploadedPreviewUrl || "").trim();
+    const forms = resolveCandidateCartForms(linked.root);
+    for (const form of forms) {
+      if (!(form instanceof HTMLFormElement)) continue;
+      if (templateId) {
+        setHiddenFormValue(form, CART_PROP_TEMPLATE_ID, templateId);
+      } else {
+        removeHiddenFormValue(form, CART_PROP_TEMPLATE_ID);
+      }
+
+      if (linked.userInteracted && previewUrl) {
+        setHiddenFormValue(form, CART_PROP_PREVIEW_URL, previewUrl);
+        setHiddenFormValue(form, CART_PROP_PREVIEW_PUBLIC, previewUrl);
+      } else {
+        removeHiddenFormValue(form, CART_PROP_PREVIEW_URL);
+        removeHiddenFormValue(form, CART_PROP_PREVIEW_PUBLIC);
+      }
+    }
+  }
+
+  function ensurePreviewModal() {
+    if (previewModalNode && previewModalNode.isConnected) return previewModalNode;
+    const node = document.createElement("div");
+    node.className = "pz-preview-modal";
+    node.setAttribute("hidden", "hidden");
+    node.innerHTML = `
+      <div class="pz-preview-modal-inner" role="dialog" aria-modal="true" aria-label="Personalized Preview">
+        <button type="button" class="pz-preview-close" aria-label="Close preview">×</button>
+        <img class="pz-preview-modal-image" alt="Personalized preview" />
+      </div>
+    `;
+    const close = () => node.setAttribute("hidden", "hidden");
+    node.addEventListener("click", (event) => {
+      if (event.target === node) close();
+    });
+    const closeBtn = node.querySelector(".pz-preview-close");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        close();
+      });
+    }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") close();
+    });
+    document.body.appendChild(node);
+    previewModalNode = node;
+    return node;
+  }
+
+  function openPreviewModal(url) {
+    const src = String(url || "").trim();
+    if (!src) return;
+    const modal = ensurePreviewModal();
+    const image = modal.querySelector(".pz-preview-modal-image");
+    if (image instanceof HTMLImageElement) {
+      image.src = src;
+    }
+    modal.removeAttribute("hidden");
+  }
+
+  function ensurePreviewButton(linked) {
+    if (!linked?.root) return null;
+    let button = linked.previewButton;
+    if (button instanceof HTMLButtonElement && button.isConnected) return button;
+
+    let row = linked.root.querySelector(".pz-preview-row");
+    if (!(row instanceof HTMLElement)) {
+      row = document.createElement("div");
+      row.className = "pz-preview-row";
+      linked.root.appendChild(row);
+    }
+    button = row.querySelector(".pz-preview-btn");
+    if (!(button instanceof HTMLButtonElement)) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "pz-preview-btn";
+      button.textContent = "Preview";
+      row.appendChild(button);
+    }
+    if (button.dataset.pzBound !== "1") {
+      button.dataset.pzBound = "1";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const previewUrl = String(button.dataset.previewUrl || "");
+        if (!previewUrl) return;
+        openPreviewModal(previewUrl);
+      });
+    }
+    linked.previewButton = button;
+    return button;
+  }
+
+  function syncPreviewButton(linked) {
+    if (!linked) return;
+    const button = ensurePreviewButton(linked);
+    if (!(button instanceof HTMLButtonElement)) return;
+    const previewUrl = linked.userInteracted ? resolvePreviewDisplayUrl(linked) : "";
+    button.dataset.previewUrl = previewUrl;
+    button.disabled = !previewUrl;
+    button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
+  }
+
+  function toAbsoluteUrl(base, maybeUrl) {
+    const raw = String(maybeUrl || "").trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw) || raw.startsWith("data:image/")) return raw;
+    const origin = trimSlash(base);
+    if (!origin) return raw;
+    try {
+      return new URL(raw, `${origin}/`).toString();
+    } catch {
+      return raw;
+    }
+  }
+
+  async function uploadPreviewSnapshot(linked, options = {}) {
+    if (!linked?.root) return "";
+    const force = Boolean(options.force);
+    const sourceDataUrl = String(linked.pendingPreviewUrl || linked.lastAppliedPreviewUrl || "").trim();
+    if (!sourceDataUrl.startsWith("data:image/")) return "";
+
+    if (!force && linked.lastUploadedPreviewSource === sourceDataUrl && linked.lastUploadedPreviewUrl) {
+      return linked.lastUploadedPreviewUrl;
+    }
+    if (linked.previewUploadPromise) {
+      return linked.previewUploadPromise;
+    }
+
+    const appBase = trimSlash(linked.root.dataset.appBaseUrl || "");
+    const templateId = String(linked.root.dataset.templateId || "").trim();
+    if (!appBase || !templateId) return "";
+
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutTimer = setTimeout(() => {
+      try {
+        controller?.abort();
+      } catch { }
+    }, PREVIEW_UPLOAD_TIMEOUT_MS);
+
+    const requestUrl = `${appBase}/api/products/${encodeURIComponent(templateId)}/upload-image`;
+    const payload = {
+      optionId: "_preview_snapshot",
+      fileName: `preview-${Date.now()}.jpg`,
+      mimeType: "image/jpeg",
+      dataUrl: sourceDataUrl,
+    };
+
+    linked.previewUploadPromise = fetch(requestUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      mode: "cors",
+      credentials: "omit",
+      signal: controller ? controller.signal : undefined,
+    })
+      .then(async (res) => {
+        let body = null;
+        try {
+          body = await res.json();
+        } catch { }
+        if (!res.ok || !body?.success || !body?.upload?.url) {
+          throw new Error(body?.error || `Upload failed (${res.status})`);
+        }
+        const absolute = toAbsoluteUrl(appBase, body.upload.url);
+        linked.lastUploadedPreviewSource = sourceDataUrl;
+        linked.lastUploadedPreviewUrl = absolute;
+        return absolute;
+      })
+      .catch((error) => {
+        console.warn("[Personalizer Block] Preview snapshot upload failed", error);
+        return linked.lastUploadedPreviewUrl || "";
+      })
+      .finally(() => {
+        clearTimeout(timeoutTimer);
+        linked.previewUploadPromise = null;
+        syncPreviewButton(linked);
+        syncCartProperties(linked);
+      });
+
+    return linked.previewUploadPromise;
+  }
+
+  function schedulePreviewUpload(linked) {
+    if (!linked?.userInteracted) return;
+    const sourceDataUrl = String(linked.pendingPreviewUrl || linked.lastAppliedPreviewUrl || "").trim();
+    if (!sourceDataUrl.startsWith("data:image/")) return;
+    if (linked.lastUploadedPreviewSource === sourceDataUrl && linked.lastUploadedPreviewUrl) return;
+    if (linked.previewUploadTimer) {
+      clearTimeout(linked.previewUploadTimer);
+    }
+    linked.previewUploadTimer = setTimeout(() => {
+      linked.previewUploadTimer = null;
+      uploadPreviewSnapshot(linked).catch(() => { });
+    }, PREVIEW_UPLOAD_DEBOUNCE_MS);
   }
 
   function restoreOriginalImageSource(img) {
@@ -543,6 +851,10 @@
       clearTimeout(linked.observerDebounceTimer);
       linked.observerDebounceTimer = null;
     }
+    if (linked.previewUploadTimer) {
+      clearTimeout(linked.previewUploadTimer);
+      linked.previewUploadTimer = null;
+    }
     linked.retryAttempts = 0;
   }
 
@@ -553,6 +865,8 @@
       if (refreshed) {
         clearPreviewRetry(linked);
         syncMainEditBar(linked);
+        syncPreviewButton(linked);
+        syncCartProperties(linked);
         return true;
       }
     }
@@ -562,7 +876,10 @@
       linked.lastPreviewUrl = linked.pendingPreviewUrl;
       linked.lastAppliedPreviewUrl = linked.pendingPreviewUrl;
       clearPreviewRetry(linked);
+      schedulePreviewUpload(linked);
       syncMainEditBar(linked);
+      syncPreviewButton(linked);
+      syncCartProperties(linked);
       return true;
     }
 
@@ -696,6 +1013,11 @@
         previewCanvas: null,
         previewCanvasHost: null,
         previewRenderToken: 0,
+        previewButton: null,
+        previewUploadTimer: null,
+        previewUploadPromise: null,
+        lastUploadedPreviewSource: "",
+        lastUploadedPreviewUrl: "",
         lastFocusAt: 0,
         lastEditStateAt: 0,
       };
@@ -730,10 +1052,17 @@
     linked.previewCanvas = linked.previewCanvas || null;
     linked.previewCanvasHost = linked.previewCanvasHost || null;
     linked.previewRenderToken = Number(linked.previewRenderToken || 0);
+    linked.previewButton = linked.previewButton || null;
+    linked.previewUploadTimer = linked.previewUploadTimer || null;
+    linked.previewUploadPromise = linked.previewUploadPromise || null;
+    linked.lastUploadedPreviewSource = String(linked.lastUploadedPreviewSource || "");
+    linked.lastUploadedPreviewUrl = String(linked.lastUploadedPreviewUrl || "");
     linked.lastFocusAt = Number(linked.lastFocusAt || 0);
     linked.lastEditStateAt = Number(linked.lastEditStateAt || 0);
 
     restoreLegacyReplacedImages(root);
+    syncPreviewButton(linked);
+    syncCartProperties(linked);
     bindMediaObserver(linked);
     syncMainEditBar(linked);
     if (linked.userInteracted && linked.pendingPreviewUrl) {
@@ -788,6 +1117,7 @@
 
   function mountAll() {
     ensureGlobalStyle();
+    ensureCartSubmitListener();
     const roots = document.querySelectorAll("[data-personalizer-block]");
     for (const root of roots) {
       mountRoot(root);
@@ -822,6 +1152,66 @@
     });
   }
 
+  async function handleCartFormSubmit(event) {
+    const form = event?.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!isAddToCartForm(form)) return;
+    if (form.dataset.pzBypassSubmit === "1") {
+      form.dataset.pzBypassSubmit = "0";
+      return;
+    }
+
+    const linked = findLinkedForForm(form);
+    if (!linked?.root) return;
+
+    syncCartProperties(linked);
+    if (!linked.userInteracted) return;
+
+    const sourceDataUrl = String(linked.pendingPreviewUrl || linked.lastAppliedPreviewUrl || "").trim();
+    if (!sourceDataUrl.startsWith("data:image/")) return;
+    if (linked.lastUploadedPreviewSource === sourceDataUrl && linked.lastUploadedPreviewUrl) {
+      syncCartProperties(linked);
+      return;
+    }
+
+    event.preventDefault();
+    const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+    const canDisableSubmitter = submitter && "disabled" in submitter;
+    const oldSubmitterDisabled = canDisableSubmitter ? Boolean(submitter.disabled) : false;
+    if (canDisableSubmitter) submitter.disabled = true;
+
+    try {
+      await uploadPreviewSnapshot(linked, { force: true });
+      syncCartProperties(linked);
+    } catch { }
+    finally {
+      if (canDisableSubmitter) {
+        submitter.disabled = oldSubmitterDisabled;
+      }
+    }
+
+    form.dataset.pzBypassSubmit = "1";
+    if (typeof form.requestSubmit === "function") {
+      try {
+        if (submitter) {
+          form.requestSubmit(submitter);
+        } else {
+          form.requestSubmit();
+        }
+        return;
+      } catch { }
+    }
+    form.submit();
+  }
+
+  function ensureCartSubmitListener() {
+    if (cartSubmitListenerBound) return;
+    document.addEventListener("submit", (event) => {
+      handleCartFormSubmit(event).catch(() => { });
+    }, true);
+    cartSubmitListenerBound = true;
+  }
+
   window.addEventListener("message", (event) => {
     const payload = event?.data;
     if (!payload || !payload.type) return;
@@ -840,9 +1230,12 @@
       const previewUrl = String(payload.previewUrl || "");
       if (!previewUrl.startsWith("data:image/")) return;
       linked.pendingPreviewUrl = previewUrl;
+      syncPreviewButton(linked);
+      syncCartProperties(linked);
       if (!linked.userInteracted) return;
       if (previewUrl === linked.lastAppliedPreviewUrl) return;
       tryApplyPendingPreview(linked);
+      schedulePreviewUpload(linked);
       syncMainEditBar(linked);
       return;
     }
@@ -873,6 +1266,9 @@
       if (linked.pendingPreviewUrl) {
         tryApplyPendingPreview(linked);
       }
+      schedulePreviewUpload(linked);
+      syncPreviewButton(linked);
+      syncCartProperties(linked);
       syncMainEditBar(linked);
       return;
     }
@@ -894,6 +1290,7 @@
           optionId: nextOptionId,
           transform: nextTransform,
         };
+        syncPreviewButton(linked);
         syncMainEditBar(linked);
         return;
       }
