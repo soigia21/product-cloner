@@ -23,7 +23,6 @@
   let mountDebounceTimer = null;
   let globalStyleMounted = false;
   let cartSubmitListenerBound = false;
-  let previewModalNode = null;
 
   function clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -272,15 +271,6 @@
     if (input) input.remove();
   }
 
-  function resolvePreviewDisplayUrl(linked) {
-    if (!linked) return "";
-    const uploaded = String(linked.lastUploadedPreviewUrl || "").trim();
-    if (uploaded) return uploaded;
-    const pending = String(linked.pendingPreviewUrl || linked.lastAppliedPreviewUrl || "").trim();
-    if (pending.startsWith("data:image/")) return pending;
-    return "";
-  }
-
   function syncCartProperties(linked) {
     if (!linked?.root) return;
     const templateId = String(linked.root.dataset.templateId || "").trim();
@@ -302,89 +292,6 @@
         removeHiddenFormValue(form, CART_PROP_PREVIEW_PUBLIC);
       }
     }
-  }
-
-  function ensurePreviewModal() {
-    if (previewModalNode && previewModalNode.isConnected) return previewModalNode;
-    const node = document.createElement("div");
-    node.className = "pz-preview-modal";
-    node.setAttribute("hidden", "hidden");
-    node.innerHTML = `
-      <div class="pz-preview-modal-inner" role="dialog" aria-modal="true" aria-label="Personalized Preview">
-        <button type="button" class="pz-preview-close" aria-label="Close preview">×</button>
-        <img class="pz-preview-modal-image" alt="Personalized preview" />
-      </div>
-    `;
-    const close = () => node.setAttribute("hidden", "hidden");
-    node.addEventListener("click", (event) => {
-      if (event.target === node) close();
-    });
-    const closeBtn = node.querySelector(".pz-preview-close");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        close();
-      });
-    }
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") close();
-    });
-    document.body.appendChild(node);
-    previewModalNode = node;
-    return node;
-  }
-
-  function openPreviewModal(url) {
-    const src = String(url || "").trim();
-    if (!src) return;
-    const modal = ensurePreviewModal();
-    const image = modal.querySelector(".pz-preview-modal-image");
-    if (image instanceof HTMLImageElement) {
-      image.src = src;
-    }
-    modal.removeAttribute("hidden");
-  }
-
-  function ensurePreviewButton(linked) {
-    if (!linked?.root) return null;
-    let button = linked.previewButton;
-    if (button instanceof HTMLButtonElement && button.isConnected) return button;
-
-    let row = linked.root.querySelector(".pz-preview-row");
-    if (!(row instanceof HTMLElement)) {
-      row = document.createElement("div");
-      row.className = "pz-preview-row";
-      linked.root.appendChild(row);
-    }
-    button = row.querySelector(".pz-preview-btn");
-    if (!(button instanceof HTMLButtonElement)) {
-      button = document.createElement("button");
-      button.type = "button";
-      button.className = "pz-preview-btn";
-      button.textContent = "Preview";
-      row.appendChild(button);
-    }
-    if (button.dataset.pzBound !== "1") {
-      button.dataset.pzBound = "1";
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        const previewUrl = String(button.dataset.previewUrl || "");
-        if (!previewUrl) return;
-        openPreviewModal(previewUrl);
-      });
-    }
-    linked.previewButton = button;
-    return button;
-  }
-
-  function syncPreviewButton(linked) {
-    if (!linked) return;
-    const button = ensurePreviewButton(linked);
-    if (!(button instanceof HTMLButtonElement)) return;
-    const previewUrl = linked.userInteracted ? resolvePreviewDisplayUrl(linked) : "";
-    button.dataset.previewUrl = previewUrl;
-    button.disabled = !previewUrl;
-    button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
   }
 
   function toAbsoluteUrl(base, maybeUrl) {
@@ -460,7 +367,6 @@
       .finally(() => {
         clearTimeout(timeoutTimer);
         linked.previewUploadPromise = null;
-        syncPreviewButton(linked);
         syncCartProperties(linked);
       });
 
@@ -865,7 +771,6 @@
       if (refreshed) {
         clearPreviewRetry(linked);
         syncMainEditBar(linked);
-        syncPreviewButton(linked);
         syncCartProperties(linked);
         return true;
       }
@@ -878,7 +783,6 @@
       clearPreviewRetry(linked);
       schedulePreviewUpload(linked);
       syncMainEditBar(linked);
-      syncPreviewButton(linked);
       syncCartProperties(linked);
       return true;
     }
@@ -1013,7 +917,6 @@
         previewCanvas: null,
         previewCanvasHost: null,
         previewRenderToken: 0,
-        previewButton: null,
         previewUploadTimer: null,
         previewUploadPromise: null,
         lastUploadedPreviewSource: "",
@@ -1052,7 +955,6 @@
     linked.previewCanvas = linked.previewCanvas || null;
     linked.previewCanvasHost = linked.previewCanvasHost || null;
     linked.previewRenderToken = Number(linked.previewRenderToken || 0);
-    linked.previewButton = linked.previewButton || null;
     linked.previewUploadTimer = linked.previewUploadTimer || null;
     linked.previewUploadPromise = linked.previewUploadPromise || null;
     linked.lastUploadedPreviewSource = String(linked.lastUploadedPreviewSource || "");
@@ -1061,7 +963,6 @@
     linked.lastEditStateAt = Number(linked.lastEditStateAt || 0);
 
     restoreLegacyReplacedImages(root);
-    syncPreviewButton(linked);
     syncCartProperties(linked);
     bindMediaObserver(linked);
     syncMainEditBar(linked);
@@ -1230,7 +1131,6 @@
       const previewUrl = String(payload.previewUrl || "");
       if (!previewUrl.startsWith("data:image/")) return;
       linked.pendingPreviewUrl = previewUrl;
-      syncPreviewButton(linked);
       syncCartProperties(linked);
       if (!linked.userInteracted) return;
       if (previewUrl === linked.lastAppliedPreviewUrl) return;
@@ -1267,7 +1167,6 @@
         tryApplyPendingPreview(linked);
       }
       schedulePreviewUpload(linked);
-      syncPreviewButton(linked);
       syncCartProperties(linked);
       syncMainEditBar(linked);
       return;
@@ -1290,7 +1189,6 @@
           optionId: nextOptionId,
           transform: nextTransform,
         };
-        syncPreviewButton(linked);
         syncMainEditBar(linked);
         return;
       }
