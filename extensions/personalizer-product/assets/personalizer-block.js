@@ -682,6 +682,8 @@
       previewCanvas: existing.previewCanvas || null,
       previewCanvasHost: existing.previewCanvasHost || null,
       previewRenderToken: Number(existing.previewRenderToken || 0),
+      lastFocusAt: Number(existing.lastFocusAt || 0),
+      lastEditStateAt: Number(existing.lastEditStateAt || 0),
     };
     iframeByWindow.set(iframe.contentWindow, linked);
     restoreLegacyReplacedImages(root);
@@ -801,7 +803,10 @@
     if (payload.type === INTERACTION_EVENT) {
       linked.userInteracted = true;
       const source = String(payload.source || "");
+      const rawInteractionAt = Number(payload.sentAt);
+      const interactionAt = Number.isFinite(rawInteractionAt) ? rawInteractionAt : Date.now();
       if (source === "upload-focus") {
+        linked.lastFocusAt = Math.max(Number(linked.lastFocusAt || 0), interactionAt);
         linked.uploadFocused = true;
         clearEditHideTimer(linked);
         linked.editState = {
@@ -826,10 +831,15 @@
     }
 
     if (payload.type === EDIT_STATE_EVENT) {
+      const rawEventAt = Number(payload.sentAt);
+      const eventAt = Number.isFinite(rawEventAt) ? rawEventAt : Date.now();
+      if (eventAt < Number(linked.lastEditStateAt || 0)) return;
+      linked.lastEditStateAt = eventAt;
       const nextEditable = Boolean(payload.editable);
       const nextOptionId = String(payload.optionId || "");
       const nextTransform = normalizeEditTransform(payload.transform || {});
       if (nextEditable) {
+        linked.lastFocusAt = Math.max(Number(linked.lastFocusAt || 0), eventAt);
         linked.uploadFocused = true;
         clearEditHideTimer(linked);
         linked.editState = {
@@ -841,14 +851,22 @@
         return;
       }
 
-      linked.uploadFocused = false;
+      if (eventAt < Number(linked.lastFocusAt || 0)) {
+        return;
+      }
       clearEditHideTimer(linked);
-      linked.editState = {
-        editable: false,
-        optionId: nextOptionId,
-        transform: nextTransform,
-      };
-      syncMainEditBar(linked);
+      linked.editHideTimer = setTimeout(() => {
+        if (!linked) return;
+        if (eventAt < Number(linked.lastFocusAt || 0)) return;
+        linked.editHideTimer = null;
+        linked.uploadFocused = false;
+        linked.editState = {
+          editable: false,
+          optionId: nextOptionId,
+          transform: nextTransform,
+        };
+        syncMainEditBar(linked);
+      }, 260);
     }
   });
 

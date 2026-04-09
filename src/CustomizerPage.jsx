@@ -506,6 +506,7 @@ export default function CustomizerPage() {
         {
           type: "product-cloner:user-interacted",
           templateId: String(activeProduct || embeddedContext.templateId || ""),
+          sentAt: Date.now(),
           ...payload,
         },
         "*"
@@ -1716,6 +1717,7 @@ export default function CustomizerPage() {
         {
           type: PARENT_UPLOAD_EDIT_STATE_EVENT,
           templateId: String(activeProduct || embeddedContext.templateId || ""),
+          sentAt: Date.now(),
           editable: Boolean(hasFocusedUpload),
           optionId: hasFocusedUpload ? String(focusedUploadOptionId || "") : "",
           transform: {
