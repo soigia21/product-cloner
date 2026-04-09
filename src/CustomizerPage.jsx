@@ -498,8 +498,9 @@ export default function CustomizerPage() {
   const notifyInteractionToParent = useCallback((payload = {}) => {
     if (!isEmbedded || typeof window === "undefined") return;
     if (window.parent === window) return;
-    if (sentParentInteractionRef.current) return;
-    sentParentInteractionRef.current = true;
+    if (!sentParentInteractionRef.current) {
+      sentParentInteractionRef.current = true;
+    }
     try {
       window.parent.postMessage(
         {

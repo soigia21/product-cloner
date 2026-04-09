@@ -458,12 +458,15 @@
     const targets = collectFeaturedImages(root);
     if (targets && targets.length > 0) {
       const image = targets[0];
-      const host =
+      let host =
         image.closest(
-          "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id]"
+          "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id], figure"
         ) ||
         image.parentElement ||
         null;
+      if (host instanceof HTMLElement && host.tagName === "PICTURE" && host.parentElement instanceof HTMLElement) {
+        host = host.parentElement;
+      }
       if (host instanceof HTMLElement) {
         return { image, host };
       }
@@ -474,12 +477,15 @@
       "media-gallery img, .product__media img, [data-product-media-container] img, [data-product-media] img, [data-media-id] img, .featured-media img, .product-gallery img, .product-single__media img, img.product-featured-media"
     );
     if (!(fallback instanceof HTMLImageElement)) return null;
-    const fallbackHost =
+    let fallbackHost =
       fallback.closest(
-        "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id]"
+        "[data-product-media-container], .product__media-item, .product__media, .featured-media, .product-single__media, .product-gallery__image, .product-main-image, [data-media-id], figure"
       ) ||
       fallback.parentElement ||
       null;
+    if (fallbackHost instanceof HTMLElement && fallbackHost.tagName === "PICTURE" && fallbackHost.parentElement instanceof HTMLElement) {
+      fallbackHost = fallbackHost.parentElement;
+    }
     if (!(fallbackHost instanceof HTMLElement)) return null;
     return { image: fallback, host: fallbackHost };
   }
