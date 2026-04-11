@@ -24,6 +24,10 @@ import {
 } from "./services/visibility-engine.js";
 import { getImage } from "./services/image-cache.js";
 import { getShopifyConfig, getToken } from "./services/shopify-auth.js";
+import {
+  assertValidShopifyWebhookSignature,
+  archiveOrderPersonalizations,
+} from "./services/order-design-archive.js";
 import https from "https";
 import http from "http";
 
@@ -40,6 +44,7 @@ const IMPORT_RETRY_ATTEMPTS = 3;
 const IMPORT_RETRY_BASE_MS = 900;
 const IMPORT_RETRY_MAX_MS = 6500;
 const inflightImportJobs = new Map();
+const ORDER_DESIGNS_DIR = path.resolve(process.cwd(), "data", "order-designs");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -304,9 +309,19 @@ async function syncTemplateMetafieldToShopify(templateId, shopifyProductId) {
 }
 
 app.use(cors());
-app.use(express.json({ limit: "50mb" }));
+app.use(
+  express.json({
+    limit: "50mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = Buffer.from(buf);
+    },
+  })
+);
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+if (!fs.existsSync(ORDER_DESIGNS_DIR)) {
+  fs.mkdirSync(ORDER_DESIGNS_DIR, { recursive: true });
 }
 
 // Serve static files in production
@@ -353,6 +368,193 @@ app.get("/api/status", (req, res) => {
     store: cfg.configured ? cfg.storeDomain : null,
     authMode: cfg.mode,
   });
+});
+
+// ===== Shopify Webhooks =====
+
+function getWebhookSecret() {
+  const candidates = [
+    process.env.SHOPIFY_WEBHOOK_SECRET,
+    process.env.SHOPIFY_CLIENT_SECRET,
+    process.env.SHOPIFY_API_SECRET,
+  ];
+  for (const value of candidates) {
+    const trimmed = String(value || "").trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function normalizeHost(raw) {
+  const value = String(raw || "").trim().toLowerCase();
+  if (!value) return "";
+  try {
+    if (/^https?:\/\//i.test(value)) {
+      return String(new URL(value).host || "").toLowerCase();
+    }
+  } catch {
+    return "";
+  }
+  return value;
+}
+
+async function handleOrdersCreateWebhook(req, res) {
+  const webhookSecret = getWebhookSecret();
+  if (webhookSecret) {
+    const valid = assertValidShopifyWebhookSignature(req, webhookSecret);
+    if (!valid) {
+      return res.status(401).json({ success: false, error: "Invalid webhook signature" });
+    }
+  }
+
+  const cfg = getShopifyConfig();
+  const requestShop = normalizeHost(req.headers["x-shopify-shop-domain"]);
+  if (cfg.configured && requestShop && requestShop !== normalizeHost(cfg.storeDomain)) {
+    return res.status(403).json({ success: false, error: "Shop domain mismatch" });
+  }
+
+  const payload = req.body || {};
+  const requestOrigin = getRequestOrigin(req);
+  try {
+    const archived = await archiveOrderPersonalizations(payload, {
+      requestOrigin,
+      shopDomain: requestShop,
+    });
+    return res.status(200).json({
+      success: true,
+      archived: {
+        orderKey: archived.orderKey,
+        lineItemCount: archived.lineItemCount,
+      },
+    });
+  } catch (error) {
+    console.error("[webhook][orders/create] archive failed:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+app.post("/api/webhooks/orders-create", handleOrdersCreateWebhook);
+app.post("/api/webhooks/orders/create", handleOrdersCreateWebhook);
+
+app.post("/api/webhooks/register-orders-create", async (req, res) => {
+  const cfg = getShopifyConfig();
+  if (!cfg.configured) {
+    return res.status(500).json({ success: false, error: "Chưa cấu hình Shopify store" });
+  }
+
+  const callbackFromBody = String(req.body?.callbackUrl || "").trim();
+  const callbackUrl = callbackFromBody || `${getRequestOrigin(req)}/api/webhooks/orders-create`;
+
+  try {
+    const tokenInfo = await getToken();
+    const endpoint = `https://${cfg.storeDomain}/admin/api/2025-10/graphql.json`;
+    const mutation = `
+      mutation webhookSubscriptionCreate($topic: WebhookSubscriptionTopic!, $webhookSubscription: WebhookSubscriptionInput!) {
+        webhookSubscriptionCreate(topic: $topic, webhookSubscription: $webhookSubscription) {
+          userErrors {
+            field
+            message
+          }
+          webhookSubscription {
+            id
+            topic
+            endpoint {
+              __typename
+              ... on WebhookHttpEndpoint {
+                callbackUrl
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": tokenInfo.accessToken,
+      },
+      body: JSON.stringify({
+        query: mutation,
+        variables: {
+          topic: "ORDERS_CREATE",
+          webhookSubscription: {
+            callbackUrl,
+            format: "JSON",
+          },
+        },
+      }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    const userErrors = payload?.data?.webhookSubscriptionCreate?.userErrors || [];
+    const subscription = payload?.data?.webhookSubscriptionCreate?.webhookSubscription || null;
+    if (!response.ok || userErrors.length > 0 || !subscription?.id) {
+      return res.status(400).json({
+        success: false,
+        error: userErrors[0]?.message || payload?.errors?.[0]?.message || `HTTP ${response.status}`,
+        payload,
+      });
+    }
+
+    res.json({
+      success: true,
+      callbackUrl,
+      subscription,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/orders/personalizations", (_req, res) => {
+  try {
+    const entries = fs.readdirSync(ORDER_DESIGNS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => {
+        const orderKey = entry.name;
+        const orderJsonPath = path.join(ORDER_DESIGNS_DIR, orderKey, "order.json");
+        let summary = null;
+        if (fs.existsSync(orderJsonPath)) {
+          try {
+            summary = JSON.parse(fs.readFileSync(orderJsonPath, "utf8"));
+          } catch {
+            summary = null;
+          }
+        }
+        return {
+          orderKey,
+          savedAt: summary?.savedAt || null,
+          orderId: summary?.orderId || null,
+          orderName: summary?.orderName || null,
+          orderNumber: summary?.orderNumber || null,
+          customerEmail: summary?.customerEmail || null,
+          personalizedLineItemCount: Number(summary?.personalizedLineItemCount || 0),
+        };
+      })
+      .sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+
+    res.json({ success: true, count: entries.length, entries });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get("/api/orders/personalizations/:orderKey", (req, res) => {
+  const orderKey = String(req.params.orderKey || "").trim();
+  if (!orderKey) return res.status(400).json({ success: false, error: "Missing orderKey" });
+  const orderDir = path.join(ORDER_DESIGNS_DIR, orderKey);
+  const orderJsonPath = path.join(orderDir, "order.json");
+  if (!fs.existsSync(orderJsonPath)) {
+    return res.status(404).json({ success: false, error: "Archive not found" });
+  }
+  try {
+    const summary = JSON.parse(fs.readFileSync(orderJsonPath, "utf8"));
+    res.json({ success: true, orderKey, orderDir, summary });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // ===== Customily Extractor =====
